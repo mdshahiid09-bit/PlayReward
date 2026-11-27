@@ -1,0 +1,76 @@
+{
+  "rules": {
+    "config": {
+      ".read": true,
+      "app": {
+        "adminBypassUids": {
+          "$uid": {
+            ".write": "auth != null && auth.uid == $uid"
+          }
+        }
+      }
+    },
+    "quizCategories": {
+      ".read": "auth != null"
+    },
+    "quizzes": {
+      ".read": "auth != null"
+    },
+    "taskCategories": {
+      ".read": "auth != null"
+    },
+    "tasks": {
+      ".read": "auth != null"
+    },
+    "leaderboard": {
+      ".read": "auth != null",
+      "$uid": {
+        ".write": "auth != null && auth.uid == $uid"
+      }
+    },
+    "referralCodes": {
+      ".read": "auth != null",
+      "$code": {
+        ".write": "auth != null && (!data.exists() || data.val() == auth.uid)"
+      }
+    },
+    "users": {
+      "$uid": {
+        ".read": "auth != null && auth.uid == $uid",
+        ".write": "auth != null && auth.uid == $uid"
+      }
+    },
+    "referrals": {
+      "$referrerUid": {
+        ".read": "auth != null && auth.uid == $referrerUid",
+        "$referredUid": {
+          ".write": "auth != null && auth.uid == $referredUid && !data.exists()"
+        }
+      }
+    },
+    "userTasks": {
+      "$uid": {
+        ".read": "auth != null && auth.uid == $uid",
+        ".write": "auth != null && auth.uid == $uid"
+      }
+    },
+    "transactions": {
+      "$uid": {
+        ".read": "auth != null && auth.uid == $uid",
+        ".write": "auth != null && auth.uid == $uid"
+      }
+    },
+    "withdrawals": {
+      ".read": "auth != null",
+      "$withdrawalId": {
+        ".write": "auth != null && !data.exists() && newData.child('uid').val() == auth.uid"
+      }
+    },
+    "notifications": {
+      "$uid": {
+        ".read": "auth != null && auth.uid == $uid",
+        ".write": "auth != null && auth.uid == $uid"
+      }
+    }
+  }
+}

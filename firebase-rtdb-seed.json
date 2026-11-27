@@ -1,0 +1,69 @@
+{
+  "config": {
+    "app": {
+      "appName": "PlayReward",
+      "maintenanceMode": false,
+      "maintenanceTitle": "Scheduled Maintenance",
+      "maintenanceMessage": "We are upgrading PlayReward to bring you faster rewards. Please check back shortly.",
+      "adminBypassUids": {},
+      "minWithdrawalCoins": 10000,
+      "maxWithdrawalCoins": 100000,
+      "coinsPerInr": 1000,
+      "minConvertCoins": 10000,
+      "tasksHeaderText": "Complete tasks and earn coins up to 5000",
+      "githubOwner": "mdshahiid09-bit",
+      "githubRepo": "PlayReward",
+      "forceUpdateEnabled": true
+    },
+    "referral": {
+      "enabled": true,
+      "referrerRewardCoins": 3000,
+      "signupBonusCoins": 500,
+      "referralLinkEnabled": true,
+      "referralBaseUrl": "https://play.google.com/store/apps/details?id=com.playreward.app",
+      "shareGreetingMessage": "Join PlayReward with my invite code {CODE} and unlock instant bonus coins!"
+    },
+    "startupPopup": {
+      "enabled": false,
+      "imageUrl": "",
+      "actionUrl": "",
+      "closeDelaySeconds": 3
+    },
+    "legal": {
+      "about": "PlayReward lets you earn coins and INR rewards by completing verified app tasks, playing interactive quizzes, and competing in daily games.",
+      "terms": "By using PlayReward, you agree to complete tasks honestly, maintain one account per person, and follow withdrawal verification guidelines.",
+      "privacy": "We collect only essential profile details (name, email, age, gender, and payout info) required to authenticate your account and process withdrawals securely."
+    },
+    "quizSettings": {
+      "enabled": true,
+      "websiteUrl": "https://playreward.app",
+      "requiredExploreSeconds": 15,
+      "gemGoal": 10,
+      "rewardCoins": 800,
+      "gemsPerCorrect": 1
+    },
+    "megaOffer": {
+      "enabled": true,
+      "title": "Mega Offer",
+      "subtitle": "Match the exact number to collect gems and unlock guaranteed coin rewards.",
+      "websiteUrl": "https://playreward.app",
+      "requiredExploreSeconds": 15,
+      "correctAnswersNeeded": 3,
+      "gemsPerWin": 1,
+      "gemGoal": 10,
+      "rewardCoins": 800
+    },
+    "superOffer": {
+      "enabled": true,
+      "title": "Super Offer — Tic Tac Toe Arena",
+      "termsAndConditions": "Choose your difficulty and coin stake. Defeat the AI in 1v1 Tic-Tac-Toe to win multiplied coins. Losing forfeits the entry stake; draws refund your entry stake.",
+      "tiers": {
+        "low_10": { "id": "low_10", "difficulty": "LOW", "entryCoins": 10, "winCoins": 12, "label": "Starter" },
+        "med_10": { "id": "med_10", "difficulty": "MEDIUM", "entryCoins": 10, "winCoins": 15, "label": "Pro" },
+        "high_10": { "id": "high_10", "difficulty": "HIGH", "entryCoins": 10, "winCoins": 18, "label": "Master" },
+        "high_100": { "id": "high_100", "difficulty": "HIGH", "entryCoins": 100, "winCoins": 180, "label": "Champion" },
+        "high_500": { "id": "high_500", "difficulty": "HIGH", "entryCoins": 500, "winCoins": 950, "label": "Legend" }
+      }
+    }
+  }
+}

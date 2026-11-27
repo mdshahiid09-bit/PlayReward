@@ -1,0 +1,4 @@
+-keepattributes Signature
+-keepattributes *Annotation*
+-keep class com.playreward.app.data.model.** { *; }
+-keepclassmembers class com.playreward.app.data.model.** { *; }
