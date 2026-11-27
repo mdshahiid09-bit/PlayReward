@@ -5,7 +5,9 @@ import android.content.Context
 import android.content.Intent
 import android.database.Cursor
 import android.net.Uri
+import android.os.Build
 import android.os.Environment
+import android.provider.Settings
 import androidx.core.content.FileProvider
 import com.playreward.app.BuildConfig
 import com.playreward.app.data.model.GithubReleaseInfo
@@ -17,8 +19,10 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
+import java.util.concurrent.TimeUnit
 
 sealed class DownloadProgressState {
     data object Idle : DownloadProgressState()
@@ -27,57 +31,111 @@ sealed class DownloadProgressState {
     data class Failed(val reason: String) : DownloadProgressState()
 }
 
-class GithubUpdateManager(private val context: Context) {
-    private val client = OkHttpClient()
+data class UpdateCheckResult(
+    val release: GithubReleaseInfo? = null,
+    val errorMessage: String? = null
+)
 
-    suspend fun checkLatestRelease(owner: String, repo: String): GithubReleaseInfo? = withContext(Dispatchers.IO) {
+class GithubUpdateManager(private val context: Context) {
+    private val client = OkHttpClient.Builder()
+        .connectTimeout(15, TimeUnit.SECONDS)
+        .readTimeout(20, TimeUnit.SECONDS)
+        .build()
+
+    suspend fun checkLatestReleaseDetailed(owner: String, repo: String): UpdateCheckResult = withContext(Dispatchers.IO) {
         val safeOwner = owner.ifBlank { BuildConfig.GITHUB_OWNER }
         val safeRepo = repo.ifBlank { BuildConfig.GITHUB_REPO }
-        val url = "https://api.github.com/repos/$safeOwner/$safeRepo/releases/latest"
-        try {
-            val request = Request.Builder()
-                .url(url)
-                .header("Accept", "application/vnd.github+json")
-                .header("User-Agent", "PlayReward-Android")
-                .build()
-            client.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) return@withContext null
-                val body = response.body?.string() ?: return@withContext null
-                val json = JSONObject(body)
-                val tag = json.optString("tag_name", "").trim()
-                val name = json.optString("name", tag)
-                val notes = json.optString("body", "Bug fixes and performance improvements.")
-                val assets = json.optJSONArray("assets") ?: return@withContext null
-                var apkUrl = ""
-                var apkName = "PlayReward-$tag.apk"
-                for (i in 0 until assets.length()) {
-                    val asset = assets.getJSONObject(i)
-                    val candidateName = asset.optString("name", "")
-                    if (candidateName.endsWith(".apk", ignoreCase = true)) {
-                        apkUrl = asset.optString("browser_download_url", "")
-                        apkName = candidateName
-                        if (candidateName.contains("release", ignoreCase = true)) break
+
+        // Try /releases/latest first, then fallback to /releases?per_page=5
+        val urls = listOf(
+            "https://api.github.com/repos/$safeOwner/$safeRepo/releases/latest",
+            "https://api.github.com/repos/$safeOwner/$safeRepo/releases?per_page=5"
+        )
+
+        var lastError: String? = null
+        for (attempt in 1..2) {
+            for (url in urls) {
+                try {
+                    val request = Request.Builder()
+                        .url(url)
+                        .header("Accept", "application/vnd.github+json")
+                        .header("User-Agent", "PlayReward-Android/${BuildConfig.VERSION_NAME}")
+                        .build()
+
+                    client.newCall(request).execute().use { response ->
+                        if (response.code == 404) {
+                            lastError = "Release not found (make sure GitHub repo $safeOwner/$safeRepo is Public and has a published release)."
+                            return@use
+                        }
+                        if (!response.isSuccessful) {
+                            lastError = "GitHub API HTTP ${response.code}"
+                            return@use
+                        }
+                        val body = response.body?.string() ?: return@use
+                        val releaseJson: JSONObject? = if (body.trim().startsWith("[")) {
+                            val arr = JSONArray(body)
+                            (0 until arr.length()).map { arr.getJSONObject(it) }
+                                .firstOrNull { !it.optBoolean("draft", false) }
+                        } else {
+                            JSONObject(body)
+                        }
+
+                        if (releaseJson != null) {
+                            val parsed = parseReleaseJson(releaseJson)
+                            if (parsed != null) {
+                                return@withContext if (isNewerVersion(parsed.tagName, BuildConfig.VERSION_NAME)) {
+                                    UpdateCheckResult(release = parsed)
+                                } else {
+                                    UpdateCheckResult(release = null, errorMessage = null)
+                                }
+                            }
+                        }
                     }
+                } catch (e: Exception) {
+                    lastError = e.localizedMessage ?: "Network error while checking updates."
                 }
-                if (apkUrl.isBlank() || !isNewerVersion(tag, BuildConfig.VERSION_NAME)) {
-                    return@withContext null
-                }
-                GithubReleaseInfo(
-                    tagName = tag,
-                    releaseName = name,
-                    releaseNotes = notes,
-                    apkDownloadUrl = apkUrl,
-                    apkFileName = apkName
-                )
             }
-        } catch (_: Exception) {
-            null
+            delay(1200)
         }
+        UpdateCheckResult(release = null, errorMessage = lastError)
+    }
+
+    suspend fun checkLatestRelease(owner: String, repo: String): GithubReleaseInfo? {
+        return checkLatestReleaseDetailed(owner, repo).release
+    }
+
+    private fun parseReleaseJson(json: JSONObject): GithubReleaseInfo? {
+        val tag = json.optString("tag_name", "").trim()
+        if (tag.isBlank()) return null
+        val name = json.optString("name", tag)
+        val notes = json.optString("body", "New version with improvements and fixes.")
+        val assets = json.optJSONArray("assets") ?: return null
+        var apkUrl = ""
+        var apkName = "PlayReward-$tag.apk"
+        for (i in 0 until assets.length()) {
+            val asset = assets.getJSONObject(i)
+            val candidateName = asset.optString("name", "")
+            if (candidateName.endsWith(".apk", ignoreCase = true)) {
+                apkUrl = asset.optString("browser_download_url", "")
+                apkName = candidateName
+                if (candidateName.contains("release", ignoreCase = true)) break
+            }
+        }
+        if (apkUrl.isBlank()) return null
+        return GithubReleaseInfo(
+            tagName = tag,
+            releaseName = name,
+            releaseNotes = notes,
+            apkDownloadUrl = apkUrl,
+            apkFileName = apkName
+        )
     }
 
     fun isNewerVersion(remoteTag: String, currentVersion: String): Boolean {
-        val r = remoteTag.removePrefix("v").removePrefix("V").split(".").mapNotNull { it.toIntOrNull() }
-        val c = currentVersion.removePrefix("v").removePrefix("V").split(".").mapNotNull { it.toIntOrNull() }
+        val cleanRemote = Regex("[0-9]+(\.[0-9]+)*").find(remoteTag)?.value ?: return false
+        val cleanCurrent = Regex("[0-9]+(\.[0-9]+)*").find(currentVersion)?.value ?: return false
+        val r = cleanRemote.split(".").mapNotNull { it.toIntOrNull() }
+        val c = cleanCurrent.split(".").mapNotNull { it.toIntOrNull() }
         val maxLen = maxOf(r.size, c.size)
         for (i in 0 until maxLen) {
             val rv = r.getOrElse(i) { 0 }
@@ -90,7 +148,8 @@ class GithubUpdateManager(private val context: Context) {
 
     fun downloadUpdate(release: GithubReleaseInfo): Flow<DownloadProgressState> = flow {
         val dm = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
-        val outFile = File(context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), release.apkFileName)
+        val dir = context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
+        val outFile = File(dir, release.apkFileName)
         if (outFile.exists()) outFile.delete()
 
         val request = DownloadManager.Request(Uri.parse(release.apkDownloadUrl))
@@ -98,7 +157,7 @@ class GithubUpdateManager(private val context: Context) {
             .setDescription("Downloading latest APK...")
             .setMimeType("application/vnd.android.package-archive")
             .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
-            .setDestinationUri(Uri.fromFile(outFile))
+            .setDestinationInExternalFilesDir(context, Environment.DIRECTORY_DOWNLOADS, release.apkFileName)
             .setAllowedOverMetered(true)
             .setAllowedOverRoaming(true)
 
@@ -124,19 +183,27 @@ class GithubUpdateManager(private val context: Context) {
                     }
                     DownloadManager.STATUS_FAILED -> {
                         finished = true
-                        emit(DownloadProgressState.Failed("Download failed. Please retry."))
+                        emit(DownloadProgressState.Failed("Download failed. Check internet and tap Retry."))
                     }
                 }
             } else {
                 cursor?.close()
                 finished = true
-                emit(DownloadProgressState.Failed("Unable to track download."))
+                emit(DownloadProgressState.Failed("Unable to track download progress."))
             }
             if (!finished) delay(350)
         }
     }.flowOn(Dispatchers.IO)
 
     fun installApk(file: File) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !context.packageManager.canRequestPackageInstalls()) {
+            val permIntent = Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES).apply {
+                data = Uri.parse("package:${context.packageName}")
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(permIntent)
+            return
+        }
         val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
         val intent = Intent(Intent.ACTION_VIEW).apply {
             setDataAndType(uri, "application/vnd.android.package-archive")

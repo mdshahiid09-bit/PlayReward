@@ -119,12 +119,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
         viewModelScope.launch {
-            appConfig.collectLatest { cfg ->
-                if (cfg.forceUpdateEnabled) {
-                    val release = updateManager.checkLatestRelease(cfg.githubOwner, cfg.githubRepo)
-                    _availableUpdate.value = release
+            appConfig
+                .map { Triple(it.forceUpdateEnabled, it.githubOwner, it.githubRepo) }
+                .distinctUntilChanged()
+                .collect { (enabled, owner, repo) ->
+                    if (enabled) {
+                        val res = updateManager.checkLatestReleaseDetailed(owner, repo)
+                        if (res.release != null) {
+                            _availableUpdate.value = res.release
+                        }
+                    } else {
+                        _availableUpdate.value = null
+                    }
                 }
-            }
         }
         viewModelScope.launch {
             userTasks.collect { list ->
@@ -177,14 +184,24 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _popupShownThisSession.value = true
     }
 
+    fun refreshUpdateCheckSilently() {
+        viewModelScope.launch {
+            val cfg = appConfig.value
+            if (!cfg.forceUpdateEnabled) return@launch
+            val res = updateManager.checkLatestReleaseDetailed(cfg.githubOwner, cfg.githubRepo)
+            if (res.release != null) _availableUpdate.value = res.release
+        }
+    }
+
     fun checkUpdateManually() {
         viewModelScope.launch {
             val cfg = appConfig.value
-            val release = updateManager.checkLatestRelease(cfg.githubOwner, cfg.githubRepo)
-            if (release != null) {
-                _availableUpdate.value = release
-            } else {
-                showToast("You are already on the latest version of PlayReward!", ToastType.SUCCESS)
+            showToast("Checking GitHub releases...", ToastType.INFO)
+            val res = updateManager.checkLatestReleaseDetailed(cfg.githubOwner, cfg.githubRepo)
+            when {
+                res.release != null -> _availableUpdate.value = res.release
+                !res.errorMessage.isNullOrBlank() -> showToast(res.errorMessage, ToastType.ERROR)
+                else -> showToast("You are already on the latest version!", ToastType.SUCCESS)
             }
         }
     }
