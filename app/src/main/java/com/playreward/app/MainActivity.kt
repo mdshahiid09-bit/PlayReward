@@ -10,6 +10,11 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.ui.layout.ContentScale
@@ -318,7 +323,11 @@ private fun PlayRewardRoot(vm: MainViewModel, onExitApp: () -> Unit) {
                         NavHost(
                             navController = navController,
                             startDestination = "home",
-                            modifier = Modifier.padding(bottom = innerPadding.calculateBottomPadding())
+                            modifier = Modifier.padding(bottom = innerPadding.calculateBottomPadding()),
+                            enterTransition = { fadeIn(tween(220)) + slideInHorizontally(tween(220)) { it / 16 } },
+                            exitTransition = { fadeOut(tween(160)) },
+                            popEnterTransition = { fadeIn(tween(200)) + slideInHorizontally(tween(200)) { -it / 16 } },
+                            popExitTransition = { fadeOut(tween(160)) + slideOutHorizontally(tween(180)) { it / 16 } }
                         ) {
                             composable("home") {
                                 HomeScreen(

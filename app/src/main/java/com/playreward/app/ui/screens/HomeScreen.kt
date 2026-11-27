@@ -106,7 +106,7 @@ fun HomeScreen(
                 }
 
                 // Notifications Icon
-                Box(modifier = Modifier.padding(end = 6.dp)) {
+                Box(modifier = Modifier.padding(end = 12.dp)) {
                     Surface(
                         modifier = Modifier.size(36.dp).bounceClick { onNavigate("notifications") },
                         shape = CircleShape,
@@ -114,7 +114,7 @@ fun HomeScreen(
                         border = BorderStroke(1.dp, colors.cardBorder)
                     ) {
                         Box(contentAlignment = Alignment.Center) {
-                            Icon(Icons.Rounded.Notifications, contentDescription = "Notifications", tint = colors.textPrimary, modifier = Modifier.size(20.dp))
+                            Icon(if (unreadCount > 0) Icons.Rounded.NotificationsActive else Icons.Rounded.NotificationsNone, contentDescription = "Notifications", tint = if (unreadCount > 0) colors.primaryIndigo else colors.textPrimary, modifier = Modifier.size(20.dp))
                         }
                     }
                     if (unreadCount > 0) {
@@ -288,7 +288,12 @@ fun HomeScreen(
                     cornerRadius = 16.dp,
                     onClick = { onNavigate("refer") }
                 ) {
-                    IconBadge(Icons.Rounded.CardGiftcard, colors.lavenderSoft, colors.primaryViolet, size = 38.dp)
+                    Box(
+                        modifier = Modifier.size(42.dp).clip(RoundedCornerShape(13.dp)).background(colors.lavenderSoft),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Image(painterResource(R.drawable.ic_pr_refer), contentDescription = "Refer", modifier = Modifier.size(26.dp))
+                    }
                     Spacer(Modifier.height(12.dp))
                     Text("Refer & Earn", style = MaterialTheme.typography.titleMedium, color = colors.textPrimary)
                     Spacer(Modifier.height(4.dp))
@@ -305,7 +310,12 @@ fun HomeScreen(
                     cornerRadius = 16.dp,
                     onClick = { onNavigate("play") }
                 ) {
-                    IconBadge(Icons.Rounded.Quiz, colors.amberSoft, colors.amberAccent, size = 38.dp)
+                    Box(
+                        modifier = Modifier.size(42.dp).clip(RoundedCornerShape(13.dp)).background(colors.amberSoft),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Image(painterResource(R.drawable.ic_pr_quiz), contentDescription = "Play & Earn", modifier = Modifier.size(26.dp))
+                    }
                     Spacer(Modifier.height(12.dp))
                     Text("Play & Earn", style = MaterialTheme.typography.titleMedium, color = colors.textPrimary)
                     Spacer(Modifier.height(4.dp))
@@ -342,7 +352,12 @@ fun HomeScreen(
             item {
                 PRCard(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        IconBadge(Icons.Rounded.TaskAlt, colors.lavenderSoft, colors.primaryIndigo, size = 42.dp)
+                        Box(
+                            modifier = Modifier.size(42.dp).clip(RoundedCornerShape(13.dp)).background(colors.lavenderSoft),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Image(painterResource(R.drawable.ic_pr_tasks), contentDescription = "Tasks", modifier = Modifier.size(26.dp))
+                        }
                         Spacer(Modifier.width(12.dp))
                         Column(modifier = Modifier.weight(1f)) {
                             Text("No Featured Tasks Yet", style = MaterialTheme.typography.titleMedium, color = colors.textPrimary)
@@ -388,7 +403,7 @@ fun HomeScreen(
                                     )
                                 }
                                 Spacer(Modifier.height(8.dp))
-                                Text(megaConfig.title, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text(megaConfig.title, color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                 Spacer(Modifier.height(4.dp))
                                 Text("Guaranteed", color = Color.White.copy(alpha = 0.85f), fontSize = 11.sp)
                                 Text("${megaConfig.rewardCoins}", color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 24.sp)
@@ -427,7 +442,7 @@ fun HomeScreen(
                                     )
                                 }
                                 Spacer(Modifier.height(8.dp))
-                                Text("Super Offer", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text("Super Offer", color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                 Spacer(Modifier.height(4.dp))
                                 Text("Win Up To", color = Color.White.copy(alpha = 0.85f), fontSize = 11.sp)
                                 Text("$topWin", color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 24.sp)
@@ -485,14 +500,13 @@ fun HomeScreen(
                                 .size(48.dp)
                                 .scale(trophyScale)
                                 .clip(RoundedCornerShape(14.dp))
-                                .background(colors.amberAccent),
+                                .background(colors.amberSoft),
                             contentAlignment = Alignment.Center
                         ) {
-                            Icon(
-                                imageVector = Icons.Rounded.EmojiEvents,
+                            Image(
+                                painter = painterResource(R.drawable.ic_pr_trophy),
                                 contentDescription = "Leaderboard",
-                                tint = Color.White,
-                                modifier = Modifier.size(26.dp)
+                                modifier = Modifier.size(28.dp)
                             )
                         }
                         Spacer(Modifier.width(12.dp))

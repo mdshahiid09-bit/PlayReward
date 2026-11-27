@@ -70,10 +70,10 @@ val LightPlayRewardColors = PlayRewardColors(
 )
 
 val DarkPlayRewardColors = PlayRewardColors(
-    canvas = Color(0xFF0F111A),
-    card = Color(0xFF1A1D2E),
-    cardBorder = Color(0xFF2B3048),
-    inputBg = Color(0xFF23273D),
+    canvas = Color(0xFF0B0E17),
+    card = Color(0xFF151A2C),
+    cardBorder = Color(0xFF26304D),
+    inputBg = Color(0xFF1C2338),
     textPrimary = Color(0xFFF8FAFC),
     textSecondary = Color(0xFF94A3B8),
     primaryIndigo = Color(0xFF6C7BFF),
@@ -112,8 +112,8 @@ private val DarkM3Scheme = darkColorScheme(
     primary = Color(0xFF6C7BFF),
     onPrimary = Color.White,
     secondary = Color(0xFFA78BFA),
-    background = Color(0xFF0F111A),
-    surface = Color(0xFF1A1D2E),
+    background = Color(0xFF0B0E17),
+    surface = Color(0xFF151A2C),
     onBackground = Color(0xFFF8FAFC),
     onSurface = Color(0xFFF8FAFC),
     error = Color(0xFFF87171)
