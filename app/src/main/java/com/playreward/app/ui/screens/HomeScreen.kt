@@ -82,7 +82,7 @@ fun HomeScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Surface(
-                    modifier = Modifier.size(42.dp).bounceClick(onClick = onOpenDrawer),
+                    modifier = Modifier.size(36.dp).bounceClick(onClick = onOpenDrawer),
                     shape = RoundedCornerShape(14.dp),
                     color = colors.card,
                     border = BorderStroke(1.dp, colors.cardBorder)
@@ -101,7 +101,7 @@ fun HomeScreen(
                 // Notifications Icon
                 Box(modifier = Modifier.padding(end = 6.dp)) {
                     Surface(
-                        modifier = Modifier.size(40.dp).bounceClick { onNavigate("notifications") },
+                        modifier = Modifier.size(36.dp).bounceClick { onNavigate("notifications") },
                         shape = CircleShape,
                         color = colors.card,
                         border = BorderStroke(1.dp, colors.cardBorder)
@@ -119,7 +119,7 @@ fun HomeScreen(
 
                 // Profile Avatar Icon
                 Surface(
-                    modifier = Modifier.size(40.dp).bounceClick { onNavigate("profile") },
+                    modifier = Modifier.size(36.dp).bounceClick { onNavigate("profile") },
                     shape = CircleShape,
                     color = colors.lavenderSoft,
                     border = BorderStroke(1.5.dp, colors.primaryIndigo)
@@ -140,71 +140,88 @@ fun HomeScreen(
             }
         }
 
-        // Top Admin Slider Banners
-        if (banners.isNotEmpty()) {
-            item {
-                val pagerState = rememberPagerState(pageCount = { banners.size })
-                LaunchedEffect(banners.size) {
-                    while (banners.size > 1) {
-                        delay(4000)
-                        pagerState.animateScrollToPage((pagerState.currentPage + 1) % banners.size)
-                    }
+        // Top Slider Banners (Admin RTDB Banners with live functional fallback slides)
+        item {
+            val effectiveBanners = remember(banners) {
+                if (banners.isNotEmpty()) banners else listOf(
+                    com.playreward.app.data.model.BannerItem("b1", "Play Quizzes & Collect Gems", "Answer daily quizzes and unlock guaranteed coin rewards", "", "ROUTE", "play", true, 0),
+                    com.playreward.app.data.model.BannerItem("b2", "1v1 AI Tic-Tac-Toe Arena", "Pick your difficulty & stake — win multiplied coins", "", "ROUTE", "super_offer", true, 1),
+                    com.playreward.app.data.model.BannerItem("b3", "Refer Friends & Earn Together", "Share your invite code and earn bonus coins on withdrawal", "", "ROUTE", "refer", true, 2)
+                )
+            }
+            val pagerState = rememberPagerState(pageCount = { effectiveBanners.size })
+            LaunchedEffect(effectiveBanners.size) {
+                while (effectiveBanners.size > 1) {
+                    delay(3800)
+                    pagerState.animateScrollToPage((pagerState.currentPage + 1) % effectiveBanners.size)
                 }
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    HorizontalPager(
-                        state = pagerState,
-                        contentPadding = PaddingValues(horizontal = 16.dp),
-                        pageSpacing = 12.dp
-                    ) { idx ->
-                        val b = banners[idx]
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(132.dp)
-                                .clip(RoundedCornerShape(22.dp))
-                                .background(colors.heroGradient)
-                                .bounceClick {
-                                    when (b.actionType.uppercase()) {
-                                        "URL" -> if (b.actionValue.isNotBlank()) {
-                                            try { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(b.actionValue))) } catch (_: Exception) {}
-                                        }
-                                        "ROUTE" -> if (b.actionValue.isNotBlank()) onNavigate(b.actionValue)
+            }
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                HorizontalPager(
+                    state = pagerState,
+                    contentPadding = PaddingValues(horizontal = 16.dp),
+                    pageSpacing = 10.dp
+                ) { idx ->
+                    val b = effectiveBanners[idx]
+                    val bgBrush = when (idx % 3) {
+                        0 -> colors.heroGradient
+                        1 -> colors.megaGradient
+                        else -> colors.superGradient
+                    }
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(124.dp)
+                            .clip(RoundedCornerShape(18.dp))
+                            .background(bgBrush)
+                            .bounceClick {
+                                viewModel.soundFx.playClick()
+                                when (b.actionType.uppercase()) {
+                                    "URL" -> if (b.actionValue.isNotBlank()) {
+                                        try { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(b.actionValue))) } catch (_: Exception) {}
                                     }
+                                    "ROUTE" -> if (b.actionValue.isNotBlank()) onNavigate(b.actionValue)
                                 }
-                        ) {
-                            if (b.imageUrl.isNotBlank()) {
-                                AsyncImage(
-                                    model = b.imageUrl,
-                                    contentDescription = b.title,
-                                    contentScale = ContentScale.Crop,
-                                    modifier = Modifier.fillMaxSize()
-                                )
-                            } else {
-                                Column(
-                                    modifier = Modifier.fillMaxSize().padding(20.dp),
-                                    verticalArrangement = Arrangement.Center
-                                ) {
-                                    Text(b.title, color = Color.White, style = MaterialTheme.typography.titleLarge)
+                            }
+                    ) {
+                        if (b.imageUrl.isNotBlank()) {
+                            AsyncImage(
+                                model = b.imageUrl,
+                                contentDescription = b.title,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        } else {
+                            Row(
+                                modifier = Modifier.fillMaxSize().padding(18.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(b.title, color = Color.White, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.ExtraBold)
                                     if (b.subtitle.isNotBlank()) {
                                         Spacer(Modifier.height(4.dp))
-                                        Text(b.subtitle, color = Color.White.copy(alpha = 0.88f), style = MaterialTheme.typography.bodyMedium)
+                                        Text(b.subtitle, color = Color.White.copy(alpha = 0.9f), style = MaterialTheme.typography.bodyMedium, maxLines = 2)
                                     }
+                                }
+                                Spacer(Modifier.width(10.dp))
+                                Surface(shape = CircleShape, color = Color.White.copy(alpha = 0.22f)) {
+                                    Icon(Icons.Rounded.ArrowForward, null, tint = Color.White, modifier = Modifier.padding(8.dp).size(18.dp))
                                 }
                             }
                         }
                     }
-                    if (banners.size > 1) {
-                        Spacer(Modifier.height(8.dp))
-                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            repeat(banners.size) { i ->
-                                Box(
-                                    modifier = Modifier
-                                        .height(6.dp)
-                                        .width(if (pagerState.currentPage == i) 20.dp else 6.dp)
-                                        .clip(CircleShape)
-                                        .background(if (pagerState.currentPage == i) colors.primaryIndigo else colors.cardBorder)
-                                )
-                            }
+                }
+                if (effectiveBanners.size > 1) {
+                    Spacer(Modifier.height(7.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                        repeat(effectiveBanners.size) { i ->
+                            Box(
+                                modifier = Modifier
+                                    .height(5.dp)
+                                    .width(if (pagerState.currentPage == i) 18.dp else 5.dp)
+                                    .clip(CircleShape)
+                                    .background(if (pagerState.currentPage == i) colors.primaryIndigo else colors.cardBorder)
+                            )
                         }
                     }
                 }

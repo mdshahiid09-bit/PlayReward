@@ -333,18 +333,32 @@ fun ForcedUpdateScreen(
 
                 when (downloadState) {
                     is DownloadProgressState.Downloading -> {
+                        val smoothProgress by animateFloatAsState(
+                            targetValue = (downloadState.percent / 100f).coerceIn(0f, 1f),
+                            animationSpec = tween(220),
+                            label = "dlSmooth"
+                        )
                         LinearProgressIndicator(
-                            progress = { downloadState.percent / 100f },
-                            modifier = Modifier.fillMaxWidth().height(10.dp).clip(CircleShape),
+                            progress = { smoothProgress },
+                            modifier = Modifier.fillMaxWidth().height(11.dp).clip(CircleShape),
                             color = colors.primaryIndigo,
                             trackColor = colors.lavenderSoft
                         )
                         Spacer(Modifier.height(10.dp))
-                        Text(
-                            text = "Downloading ${downloadState.percent}% (${String.format("%.1f", downloadState.downloadedMb)} / ${String.format("%.1f", downloadState.totalMb)} MB)",
-                            style = MaterialTheme.typography.labelLarge,
-                            color = colors.primaryIndigo
-                        )
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text(
+                                text = "${downloadState.percent}%  •  ${String.format("%.1f", downloadState.downloadedMb)} / ${String.format("%.1f", downloadState.totalMb)} MB",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = colors.primaryIndigo
+                            )
+                            if (downloadState.speedKbps > 0) {
+                                Text(
+                                    text = "${downloadState.speedKbps} KB/s",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = colors.textSecondary
+                                )
+                            }
+                        }
                     }
                     is DownloadProgressState.Completed -> {
                         Text("Download complete! Tap below if installer didn't open.", style = MaterialTheme.typography.bodyMedium, color = colors.mintAccent, textAlign = TextAlign.Center)

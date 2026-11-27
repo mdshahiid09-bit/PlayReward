@@ -3,7 +3,9 @@ package com.playreward.app.ui.viewmodel
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.playreward.app.audio.SoundEffectsManager
 import com.playreward.app.data.model.*
+import com.playreward.app.service.PlayRewardForegroundService
 import com.playreward.app.data.prefs.UserPreferences
 import com.playreward.app.data.repository.FirebaseRepository
 import com.playreward.app.notifications.LocalNotificationHelper
@@ -22,6 +24,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val repo = FirebaseRepository()
     val prefs = UserPreferences(application)
     val updateManager = GithubUpdateManager(application)
+    val soundFx = SoundEffectsManager(application)
+
+    private val _splashDone = MutableStateFlow(false)
+    val splashDone: StateFlow<Boolean> = _splashDone.asStateFlow()
+
+    val soundEnabled: StateFlow<Boolean> = prefs.soundEnabledFlow
+        .stateIn(viewModelScope, SharingStarted.Eagerly, true)
+    val hapticsEnabled: StateFlow<Boolean> = prefs.hapticsEnabledFlow
+        .stateIn(viewModelScope, SharingStarted.Eagerly, true)
+    val bgServiceEnabled: StateFlow<Boolean> = prefs.bgServiceEnabledFlow
+        .stateIn(viewModelScope, SharingStarted.Eagerly, true)
 
     private val _toast = MutableStateFlow<ToastState?>(null)
     val toast: StateFlow<ToastState?> = _toast.asStateFlow()
@@ -113,6 +126,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     init {
         viewModelScope.launch {
+            soundEnabled.collect { soundFx.soundEnabled = it }
+        }
+        viewModelScope.launch {
+            hapticsEnabled.collect { soundFx.hapticsEnabled = it }
+        }
+        viewModelScope.launch {
+            bgServiceEnabled.collect { enabled ->
+                if (enabled) PlayRewardForegroundService.start(getApplication())
+                else PlayRewardForegroundService.stop(getApplication())
+            }
+        }
+        viewModelScope.launch {
             if (!prefs.isKeepLoggedIn() && repo.currentUser != null) {
                 repo.signOut()
                 _currentUid.value = null
@@ -168,7 +193,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun markSplashDone() { _splashDone.value = true }
+    fun setSoundEnabled(v: Boolean) { viewModelScope.launch { prefs.setSoundEnabled(v) } }
+    fun setHapticsEnabled(v: Boolean) { viewModelScope.launch { prefs.setHapticsEnabled(v) } }
+    fun setBgServiceEnabled(v: Boolean) { viewModelScope.launch { prefs.setBgServiceEnabled(v) } }
+
     fun showToast(message: String, type: ToastType = ToastType.INFO) {
+        when (type) {
+            ToastType.SUCCESS -> soundFx.playSuccess()
+            ToastType.ERROR -> soundFx.playError()
+            ToastType.INFO -> soundFx.playClick()
+        }
         viewModelScope.launch {
             _toast.value = ToastState(message, type)
             delay(3000)

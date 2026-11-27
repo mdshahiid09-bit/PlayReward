@@ -337,60 +337,174 @@ fun LeaderboardScreen(
 ) {
     val colors = PRTheme.colors
     val entries by viewModel.leaderboard.collectAsState()
+    val profile by viewModel.userProfile.collectAsState()
+
+    val top3 = remember(entries) { entries.take(3) }
+    val rest = remember(entries) { entries.drop(3) }
+    val myRank = remember(entries, profile?.uid) {
+        val idx = entries.indexOfFirst { it.uid == profile?.uid }
+        if (idx >= 0) idx + 1 else null
+    }
 
     Column(modifier = Modifier.fillMaxSize().background(colors.canvas).statusBarsPadding().navigationBarsPadding()) {
-        Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = onBack) { Icon(Icons.Rounded.ArrowBackIosNew, null, tint = colors.textPrimary, modifier = Modifier.size(20.dp)) }
-            Text("Top Earners", style = MaterialTheme.typography.titleLarge, color = colors.textPrimary)
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(onClick = onBack) { Icon(Icons.Rounded.ArrowBackIosNew, null, tint = colors.textPrimary, modifier = Modifier.size(18.dp)) }
+            Column(modifier = Modifier.weight(1f)) {
+                Text("Top Earners", style = MaterialTheme.typography.titleLarge, color = colors.textPrimary)
+                Text("Live rankings updated in real time", style = MaterialTheme.typography.labelSmall, color = colors.textSecondary)
+            }
+            if (myRank != null) {
+                Surface(shape = CircleShape, color = colors.lavenderSoft) {
+                    Text(
+                        text = "Your Rank #$myRank",
+                        color = colors.primaryIndigo,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 12.sp,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                    )
+                }
+            }
         }
+
         if (entries.isEmpty()) {
             EmptyStateView(
                 icon = Icons.Rounded.EmojiEvents,
                 title = "Leaderboard Updating",
-                subtitle = "Start earning coins through tasks and games to claim the #1 spot!"
+                subtitle = "Start earning coins through tasks and games to claim the #1 podium spot!"
             )
         } else {
-            LazyColumn(contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                itemsIndexed(entries, key = { _, e -> e.uid }) { idx, item ->
-                    val rank = idx + 1
-                    val bg = when (rank) {
-                        1 -> Color(0xFFFFFBEB)
-                        2 -> Color(0xFFF1F5F9)
-                        3 -> Color(0xFFFFF7ED)
-                        else -> colors.card
-                    }
-                    val border = when (rank) {
-                        1 -> Color(0xFFF59E0B)
-                        2 -> Color(0xFF94A3B8)
-                        3 -> Color(0xFFFB923C)
-                        else -> colors.cardBorder
-                    }
-                    Surface(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(18.dp),
-                        color = if (colors.isDark && rank <= 3) colors.card else bg,
-                        border = BorderStroke(if (rank <= 3) 1.5.dp else 1.dp, border)
-                    ) {
+            LazyColumn(
+                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                // Top 3 Visual Podium (#2 Left, #1 Center Elevated, #3 Right)
+                item {
+                    PRCard(cornerRadius = 20.dp, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 16.dp)) {
                         Row(
-                            modifier = Modifier.padding(14.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.Bottom
                         ) {
-                            Box(
-                                modifier = Modifier.size(36.dp).clip(CircleShape).background(if (rank <= 3) border.copy(alpha = 0.2f) else colors.inputBg),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text("#$rank", fontWeight = FontWeight.ExtraBold, color = if (rank <= 3) border else colors.textSecondary, fontSize = 13.sp)
-                            }
-                            Spacer(Modifier.width(12.dp))
-                            Text(item.fullName, style = MaterialTheme.typography.titleMedium, color = colors.textPrimary, modifier = Modifier.weight(1f))
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Image(painterResource(R.drawable.ic_coin), null, modifier = Modifier.size(18.dp))
-                                Spacer(Modifier.width(5.dp))
-                                Text("${item.totalCoinsEarned}", fontWeight = FontWeight.ExtraBold, color = colors.primaryIndigo)
+                            PodiumColumn(
+                                entry = top3.getOrNull(1),
+                                rank = 2,
+                                pedestalHeight = 62.dp,
+                                accent = Color(0xFF94A3B8),
+                                bg = Color(0xFFF1F5F9),
+                                modifier = Modifier.weight(1f)
+                            )
+                            PodiumColumn(
+                                entry = top3.getOrNull(0),
+                                rank = 1,
+                                pedestalHeight = 84.dp,
+                                accent = Color(0xFFF59E0B),
+                                bg = Color(0xFFFFFBEB),
+                                modifier = Modifier.weight(1.12f)
+                            )
+                            PodiumColumn(
+                                entry = top3.getOrNull(2),
+                                rank = 3,
+                                pedestalHeight = 50.dp,
+                                accent = Color(0xFFEA580C),
+                                bg = Color(0xFFFFF7ED),
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                    }
+                }
+
+                if (rest.isNotEmpty()) {
+                    item {
+                        Text("All Rankings", style = MaterialTheme.typography.titleMedium, color = colors.textPrimary, modifier = Modifier.padding(top = 4.dp))
+                    }
+                    itemsIndexed(rest, key = { _, e -> e.uid }) { idx, item ->
+                        val rank = idx + 4
+                        PRCard(cornerRadius = 14.dp, contentPadding = PaddingValues(12.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                                Box(
+                                    modifier = Modifier.size(32.dp).clip(CircleShape).background(colors.inputBg),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text("#$rank", fontWeight = FontWeight.Bold, color = colors.textSecondary, fontSize = 12.sp)
+                                }
+                                Spacer(Modifier.width(10.dp))
+                                Box(
+                                    modifier = Modifier.size(34.dp).clip(CircleShape).background(colors.lavenderSoft),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text((item.fullName.firstOrNull() ?: 'P').uppercase(), fontWeight = FontWeight.Bold, color = colors.primaryIndigo, fontSize = 13.sp)
+                                }
+                                Spacer(Modifier.width(10.dp))
+                                Text(item.fullName, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold, color = colors.textPrimary, modifier = Modifier.weight(1f))
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Image(painterResource(R.drawable.ic_coin), null, modifier = Modifier.size(16.dp))
+                                    Spacer(Modifier.width(4.dp))
+                                    Text("${item.totalCoinsEarned}", fontWeight = FontWeight.ExtraBold, color = colors.primaryIndigo, fontSize = 14.sp)
+                                }
                             }
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PodiumColumn(
+    entry: com.playreward.app.data.model.LeaderboardEntry?,
+    rank: Int,
+    pedestalHeight: androidx.compose.ui.unit.Dp,
+    accent: Color,
+    bg: Color,
+    modifier: Modifier = Modifier
+) {
+    val colors = PRTheme.colors
+    Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+        if (rank == 1) {
+            Icon(Icons.Rounded.EmojiEvents, null, tint = accent, modifier = Modifier.size(22.dp))
+            Spacer(Modifier.height(2.dp))
+        }
+        Box(
+            modifier = Modifier
+                .size(if (rank == 1) 48.dp else 40.dp)
+                .clip(CircleShape)
+                .background(accent.copy(alpha = 0.18f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = (entry?.fullName?.firstOrNull() ?: '-').uppercase(),
+                fontWeight = FontWeight.ExtraBold,
+                color = accent,
+                fontSize = if (rank == 1) 18.sp else 15.sp
+            )
+        }
+        Spacer(Modifier.height(5.dp))
+        Text(
+            text = entry?.fullName?.substringBefore(" ") ?: "Open",
+            style = MaterialTheme.typography.labelLarge,
+            color = colors.textPrimary,
+            maxLines = 1,
+            textAlign = TextAlign.Center
+        )
+        Text(
+            text = if (entry != null) "${entry.totalCoinsEarned}" else "—",
+            fontSize = 11.5.sp,
+            fontWeight = FontWeight.ExtraBold,
+            color = colors.primaryIndigo
+        )
+        Spacer(Modifier.height(6.dp))
+        Surface(
+            modifier = Modifier.fillMaxWidth().height(pedestalHeight),
+            shape = RoundedCornerShape(topStart = 14.dp, topEnd = 14.dp, bottomStart = 8.dp, bottomEnd = 8.dp),
+            color = if (colors.isDark) colors.inputBg else bg,
+            border = BorderStroke(1.2.dp, accent.copy(alpha = 0.6f))
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Text("#$rank", fontWeight = FontWeight.ExtraBold, fontSize = 18.sp, color = accent)
             }
         }
     }

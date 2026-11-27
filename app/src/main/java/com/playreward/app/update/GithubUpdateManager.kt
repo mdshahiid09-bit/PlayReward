@@ -1,9 +1,7 @@
 package com.playreward.app.update
 
-import android.app.DownloadManager
 import android.content.Context
 import android.content.Intent
-import android.database.Cursor
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
@@ -11,6 +9,7 @@ import android.provider.Settings
 import androidx.core.content.FileProvider
 import com.playreward.app.BuildConfig
 import com.playreward.app.data.model.GithubReleaseInfo
+import com.playreward.app.service.PlayRewardForegroundService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -22,11 +21,17 @@ import okhttp3.Request
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
+import java.io.FileOutputStream
 import java.util.concurrent.TimeUnit
 
 sealed class DownloadProgressState {
     data object Idle : DownloadProgressState()
-    data class Downloading(val percent: Int, val downloadedMb: Float, val totalMb: Float) : DownloadProgressState()
+    data class Downloading(
+        val percent: Int,
+        val downloadedMb: Float,
+        val totalMb: Float,
+        val speedKbps: Int = 0
+    ) : DownloadProgressState()
     data class Completed(val file: File) : DownloadProgressState()
     data class Failed(val reason: String) : DownloadProgressState()
 }
@@ -38,15 +43,16 @@ data class UpdateCheckResult(
 
 class GithubUpdateManager(private val context: Context) {
     private val client = OkHttpClient.Builder()
-        .connectTimeout(15, TimeUnit.SECONDS)
-        .readTimeout(20, TimeUnit.SECONDS)
+        .followRedirects(true)
+        .followSslRedirects(true)
+        .connectTimeout(20, TimeUnit.SECONDS)
+        .readTimeout(60, TimeUnit.SECONDS)
         .build()
 
     suspend fun checkLatestReleaseDetailed(owner: String, repo: String): UpdateCheckResult = withContext(Dispatchers.IO) {
         val safeOwner = owner.ifBlank { BuildConfig.GITHUB_OWNER }
         val safeRepo = repo.ifBlank { BuildConfig.GITHUB_REPO }
 
-        // Try /releases/latest first, then fallback to /releases?per_page=5
         val urls = listOf(
             "https://api.github.com/repos/$safeOwner/$safeRepo/releases/latest",
             "https://api.github.com/repos/$safeOwner/$safeRepo/releases?per_page=5"
@@ -64,7 +70,7 @@ class GithubUpdateManager(private val context: Context) {
 
                     client.newCall(request).execute().use { response ->
                         if (response.code == 404) {
-                            lastError = "Release not found (make sure GitHub repo $safeOwner/$safeRepo is Public and has a published release)."
+                            lastError = "Release not found (make sure $safeOwner/$safeRepo is Public)."
                             return@use
                         }
                         if (!response.isSuccessful) {
@@ -95,13 +101,9 @@ class GithubUpdateManager(private val context: Context) {
                     lastError = e.localizedMessage ?: "Network error while checking updates."
                 }
             }
-            delay(1200)
+            delay(1000)
         }
         UpdateCheckResult(release = null, errorMessage = lastError)
-    }
-
-    suspend fun checkLatestRelease(owner: String, repo: String): GithubReleaseInfo? {
-        return checkLatestReleaseDetailed(owner, repo).release
     }
 
     private fun parseReleaseJson(json: JSONObject): GithubReleaseInfo? {
@@ -122,13 +124,7 @@ class GithubUpdateManager(private val context: Context) {
             }
         }
         if (apkUrl.isBlank()) return null
-        return GithubReleaseInfo(
-            tagName = tag,
-            releaseName = name,
-            releaseNotes = notes,
-            apkDownloadUrl = apkUrl,
-            apkFileName = apkName
-        )
+        return GithubReleaseInfo(tag, name, notes, apkUrl, apkName)
     }
 
     fun isNewerVersion(remoteTag: String, currentVersion: String): Boolean {
@@ -146,52 +142,76 @@ class GithubUpdateManager(private val context: Context) {
         return false
     }
 
+    // Real byte-by-byte streaming download with smooth progress updates & foreground notification
     fun downloadUpdate(release: GithubReleaseInfo): Flow<DownloadProgressState> = flow {
-        val dm = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
-        val dir = context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
+        emit(DownloadProgressState.Downloading(0, 0f, 0f, 0))
+        PlayRewardForegroundService.start(context, "Updating PlayReward ${release.tagName}", "Connecting...", 0)
+
+        val dir = context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS) ?: context.cacheDir
         val outFile = File(dir, release.apkFileName)
         if (outFile.exists()) outFile.delete()
 
-        val request = DownloadManager.Request(Uri.parse(release.apkDownloadUrl))
-            .setTitle("Updating PlayReward ${release.tagName}")
-            .setDescription("Downloading latest APK...")
-            .setMimeType("application/vnd.android.package-archive")
-            .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
-            .setDestinationInExternalFilesDir(context, Environment.DIRECTORY_DOWNLOADS, release.apkFileName)
-            .setAllowedOverMetered(true)
-            .setAllowedOverRoaming(true)
+        try {
+            val request = Request.Builder()
+                .url(release.apkDownloadUrl)
+                .header("User-Agent", "PlayReward-Android/${BuildConfig.VERSION_NAME}")
+                .build()
 
-        val downloadId = dm.enqueue(request)
-        var finished = false
-        while (!finished) {
-            val query = DownloadManager.Query().setFilterById(downloadId)
-            val cursor: Cursor? = dm.query(query)
-            if (cursor != null && cursor.moveToFirst()) {
-                val status = cursor.getInt(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS))
-                val downloaded = cursor.getLong(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR))
-                val total = cursor.getLong(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_TOTAL_SIZE_BYTES))
-                cursor.close()
+            client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) {
+                    emit(DownloadProgressState.Failed("Download failed (HTTP ${response.code}). Tap Retry."))
+                    return@flow
+                }
+                val body = response.body ?: run {
+                    emit(DownloadProgressState.Failed("Empty APK stream."))
+                    return@flow
+                }
+                val totalBytes = body.contentLength().coerceAtLeast(1L)
+                val totalMb = totalBytes / 1048576f
+                var downloadedBytes = 0L
+                val buffer = ByteArray(8192)
+                var lastEmitTime = System.currentTimeMillis()
+                var lastBytesAtEmit = 0L
+                var lastNotifPct = -1
 
-                when (status) {
-                    DownloadManager.STATUS_RUNNING, DownloadManager.STATUS_PENDING, DownloadManager.STATUS_PAUSED -> {
-                        val pct = if (total > 0) ((downloaded * 100L) / total).toInt().coerceIn(0, 99) else 0
-                        emit(DownloadProgressState.Downloading(pct, downloaded / 1048576f, (total.coerceAtLeast(1)) / 1048576f))
-                    }
-                    DownloadManager.STATUS_SUCCESSFUL -> {
-                        finished = true
-                        emit(DownloadProgressState.Completed(outFile))
-                    }
-                    DownloadManager.STATUS_FAILED -> {
-                        finished = true
-                        emit(DownloadProgressState.Failed("Download failed. Check internet and tap Retry."))
+                body.byteStream().use { input ->
+                    FileOutputStream(outFile).use { output ->
+                        while (true) {
+                            val read = input.read(buffer)
+                            if (read == -1) break
+                            output.write(buffer, 0, read)
+                            downloadedBytes += read
+
+                            val now = System.currentTimeMillis()
+                            if (now - lastEmitTime >= 120L || downloadedBytes >= totalBytes) {
+                                val dtSec = ((now - lastEmitTime).coerceAtLeast(1L)) / 1000f
+                                val kbps = (((downloadedBytes - lastBytesAtEmit) / 1024f) / dtSec).toInt().coerceAtLeast(0)
+                                val pct = ((downloadedBytes * 100L) / totalBytes).toInt().coerceIn(0, 99)
+                                val dlMb = downloadedBytes / 1048576f
+                                emit(DownloadProgressState.Downloading(pct, dlMb, totalMb, kbps))
+                                if (pct != lastNotifPct && pct % 2 == 0) {
+                                    lastNotifPct = pct
+                                    PlayRewardForegroundService.start(
+                                        context,
+                                        "Downloading PlayReward ${release.tagName}",
+                                        "$pct% • ${String.format("%.1f", dlMb)} / ${String.format("%.1f", totalMb)} MB",
+                                        pct
+                                    )
+                                }
+                                lastEmitTime = now
+                                lastBytesAtEmit = downloadedBytes
+                            }
+                        }
+                        output.flush()
                     }
                 }
-            } else {
-                cursor?.close()
-                finished = true
-                emit(DownloadProgressState.Failed("Unable to track download progress."))
+                PlayRewardForegroundService.start(context, "PlayReward ${release.tagName} Ready", "Tap to install update", 100)
+                emit(DownloadProgressState.Downloading(100, totalMb, totalMb, 0))
+                delay(250)
+                emit(DownloadProgressState.Completed(outFile))
             }
-            if (!finished) delay(350)
+        } catch (e: Exception) {
+            emit(DownloadProgressState.Failed(e.localizedMessage ?: "Download interrupted. Tap Retry."))
         }
     }.flowOn(Dispatchers.IO)
 

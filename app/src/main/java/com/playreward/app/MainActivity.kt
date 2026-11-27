@@ -80,7 +80,7 @@ private fun PlayRewardRoot(vm: MainViewModel, onExitApp: () -> Unit) {
     val localBypassUid by vm.localAdminBypassUid.collectAsState()
     val toast by vm.toast.collectAsState()
 
-    var splashDone by remember { mutableStateOf(false) }
+    val splashDone by vm.splashDone.collectAsState()
     var showExitDialog by remember { mutableStateOf(false) }
 
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -110,7 +110,7 @@ private fun PlayRewardRoot(vm: MainViewModel, onExitApp: () -> Unit) {
     Box(modifier = Modifier.fillMaxSize().background(colors.canvas)) {
         when {
             !splashDone -> {
-                SplashScreen(onFinished = { splashDone = true })
+                SplashScreen(onFinished = { vm.markSplashDone() })
             }
             availableUpdate != null && appConfig.forceUpdateEnabled -> {
                 ForcedUpdateScreen(
@@ -263,7 +263,7 @@ private fun PlayRewardRoot(vm: MainViewModel, onExitApp: () -> Unit) {
                                                 modifier = Modifier
                                                     .weight(1f)
                                                     .clip(RoundedCornerShape(12.dp))
-                                                    .clickable { navigateToRoute(tab.route) }
+                                                    .clickable { vm.soundFx.playClick(); navigateToRoute(tab.route) }
                                                     .padding(vertical = 4.dp),
                                                 horizontalAlignment = Alignment.CenterHorizontally
                                             ) {

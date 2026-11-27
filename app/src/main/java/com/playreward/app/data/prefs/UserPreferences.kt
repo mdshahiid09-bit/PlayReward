@@ -18,6 +18,9 @@ class UserPreferences(private val context: Context) {
         private val KEY_ONBOARDING_DONE = booleanPreferencesKey("onboarding_done")
         private val KEY_KEEP_LOGGED_IN = booleanPreferencesKey("keep_logged_in")
         private val KEY_ADMIN_BYPASS_UID = stringPreferencesKey("admin_bypass_uid")
+        private val KEY_SOUND_ENABLED = booleanPreferencesKey("sound_enabled")
+        private val KEY_HAPTICS_ENABLED = booleanPreferencesKey("haptics_enabled")
+        private val KEY_BG_SERVICE_ENABLED = booleanPreferencesKey("bg_service_enabled")
     }
 
     val themeModeFlow: Flow<ThemeMode> = context.dataStore.data.map { prefs ->
@@ -31,22 +34,16 @@ class UserPreferences(private val context: Context) {
     val onboardingDoneFlow: Flow<Boolean> = context.dataStore.data.map { it[KEY_ONBOARDING_DONE] ?: false }
     val keepLoggedInFlow: Flow<Boolean> = context.dataStore.data.map { it[KEY_KEEP_LOGGED_IN] ?: true }
     val localAdminBypassUidFlow: Flow<String> = context.dataStore.data.map { it[KEY_ADMIN_BYPASS_UID] ?: "" }
+    val soundEnabledFlow: Flow<Boolean> = context.dataStore.data.map { it[KEY_SOUND_ENABLED] ?: true }
+    val hapticsEnabledFlow: Flow<Boolean> = context.dataStore.data.map { it[KEY_HAPTICS_ENABLED] ?: true }
+    val bgServiceEnabledFlow: Flow<Boolean> = context.dataStore.data.map { it[KEY_BG_SERVICE_ENABLED] ?: true }
 
-    suspend fun setThemeMode(mode: ThemeMode) {
-        context.dataStore.edit { it[KEY_THEME] = mode.name }
-    }
-
-    suspend fun setOnboardingDone(done: Boolean) {
-        context.dataStore.edit { it[KEY_ONBOARDING_DONE] = done }
-    }
-
-    suspend fun setKeepLoggedIn(keep: Boolean) {
-        context.dataStore.edit { it[KEY_KEEP_LOGGED_IN] = keep }
-    }
-
+    suspend fun setThemeMode(mode: ThemeMode) { context.dataStore.edit { it[KEY_THEME] = mode.name } }
+    suspend fun setOnboardingDone(done: Boolean) { context.dataStore.edit { it[KEY_ONBOARDING_DONE] = done } }
+    suspend fun setKeepLoggedIn(keep: Boolean) { context.dataStore.edit { it[KEY_KEEP_LOGGED_IN] = keep } }
     suspend fun isKeepLoggedIn(): Boolean = keepLoggedInFlow.first()
-
-    suspend fun setLocalAdminBypassUid(uid: String) {
-        context.dataStore.edit { it[KEY_ADMIN_BYPASS_UID] = uid.trim() }
-    }
+    suspend fun setLocalAdminBypassUid(uid: String) { context.dataStore.edit { it[KEY_ADMIN_BYPASS_UID] = uid.trim() } }
+    suspend fun setSoundEnabled(enabled: Boolean) { context.dataStore.edit { it[KEY_SOUND_ENABLED] = enabled } }
+    suspend fun setHapticsEnabled(enabled: Boolean) { context.dataStore.edit { it[KEY_HAPTICS_ENABLED] = enabled } }
+    suspend fun setBgServiceEnabled(enabled: Boolean) { context.dataStore.edit { it[KEY_BG_SERVICE_ENABLED] = enabled } }
 }

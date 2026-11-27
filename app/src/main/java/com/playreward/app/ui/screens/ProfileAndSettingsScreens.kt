@@ -307,6 +307,9 @@ fun SettingsScreen(viewModel: MainViewModel, onBack: () -> Unit) {
     val colors = PRTheme.colors
     val scope = rememberCoroutineScope()
     val themeMode by viewModel.themeMode.collectAsState()
+    val soundEnabled by viewModel.soundEnabled.collectAsState()
+    val hapticsEnabled by viewModel.hapticsEnabled.collectAsState()
+    val bgServiceEnabled by viewModel.bgServiceEnabled.collectAsState()
     val profile by viewModel.userProfile.collectAsState()
 
     var oldPass by remember { mutableStateOf("") }
@@ -350,6 +353,41 @@ fun SettingsScreen(viewModel: MainViewModel, onBack: () -> Unit) {
                             modifier = Modifier.weight(1f)
                         )
                     }
+                }
+            }
+        }
+
+
+        // Sound, Haptics & Background Service Toggles
+        item {
+            PRCard(cornerRadius = 16.dp) {
+                Text("Sound, Effects & Background", style = MaterialTheme.typography.titleMedium, color = colors.textPrimary)
+                Spacer(Modifier.height(8.dp))
+                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Sound Effects", style = MaterialTheme.typography.bodyLarge, color = colors.textPrimary)
+                        Text("Click, reward & celebration tones", style = MaterialTheme.typography.labelSmall, color = colors.textSecondary)
+                    }
+                    Switch(checked = soundEnabled, onCheckedChange = {
+                        viewModel.setSoundEnabled(it)
+                        if (it) viewModel.soundFx.playClick()
+                    })
+                }
+                HorizontalDivider(color = colors.cardBorder, modifier = Modifier.padding(vertical = 8.dp))
+                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Haptic Feedback", style = MaterialTheme.typography.bodyLarge, color = colors.textPrimary)
+                        Text("Subtle touch vibration on actions", style = MaterialTheme.typography.labelSmall, color = colors.textSecondary)
+                    }
+                    Switch(checked = hapticsEnabled, onCheckedChange = { viewModel.setHapticsEnabled(it) })
+                }
+                HorizontalDivider(color = colors.cardBorder, modifier = Modifier.padding(vertical = 8.dp))
+                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Keep Active in Background", style = MaterialTheme.typography.bodyLarge, color = colors.textPrimary)
+                        Text("Foreground service prevents app reload on minimize", style = MaterialTheme.typography.labelSmall, color = colors.textSecondary)
+                    }
+                    Switch(checked = bgServiceEnabled, onCheckedChange = { viewModel.setBgServiceEnabled(it) })
                 }
             }
         }

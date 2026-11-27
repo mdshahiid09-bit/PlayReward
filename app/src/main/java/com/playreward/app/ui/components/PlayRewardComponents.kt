@@ -418,8 +418,8 @@ fun IconBadge(
     icon: ImageVector,
     containerColor: Color,
     iconTint: Color,
-    size: Dp = 44.dp,
-    cornerRadius: Dp = 14.dp
+    size: Dp = 36.dp,
+    cornerRadius: Dp = 11.dp
 ) {
     Box(
         modifier = Modifier
