@@ -46,22 +46,22 @@ fun ProfileScreen(
     var verifying by remember { mutableStateOf(false) }
 
     LazyColumn(
-        modifier = Modifier.fillMaxSize().background(colors.canvas),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        modifier = Modifier.fillMaxSize().background(colors.canvas).statusBarsPadding(),
+        contentPadding = PaddingValues(14.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         // Profile Summary Card with Small Detail Chips + Email Verified Status
         item {
-            PRCard(modifier = Modifier.fillMaxWidth().statusBarsPadding(), cornerRadius = 22.dp) {
+            PRCard(modifier = Modifier.fillMaxWidth(), cornerRadius = 16.dp) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(
-                        modifier = Modifier.size(60.dp).clip(CircleShape).background(colors.heroGradient),
+                        modifier = Modifier.size(48.dp).clip(CircleShape).background(colors.heroGradient),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
                             text = (profile?.fullName?.firstOrNull() ?: 'P').uppercase(),
                             color = Color.White,
-                            fontSize = 24.sp,
+                            fontSize = 20.sp,
                             fontWeight = FontWeight.ExtraBold
                         )
                     }
@@ -117,7 +117,7 @@ fun ProfileScreen(
 
         // Big Professional Statistics Card
         item {
-            PRCard(cornerRadius = 22.dp) {
+            PRCard(cornerRadius = 16.dp) {
                 Text("Account Statistics", style = MaterialTheme.typography.titleMedium, color = colors.textPrimary)
                 Spacer(Modifier.height(14.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
@@ -134,7 +134,7 @@ fun ProfileScreen(
 
         // Grouped Settings & Profile Actions Card (Reference Video 00:58)
         item {
-            PRCard(cornerRadius = 20.dp, contentPadding = PaddingValues(vertical = 6.dp)) {
+            PRCard(cornerRadius = 16.dp, contentPadding = PaddingValues(vertical = 6.dp)) {
                 ProfileMenuRow(Icons.Rounded.Edit, "Edit Profile", colors.lavenderSoft, colors.primaryIndigo) { onNavigate("edit_profile") }
                 HorizontalDivider(color = colors.cardBorder, modifier = Modifier.padding(horizontal = 16.dp))
                 ProfileMenuRow(Icons.Rounded.Settings, "Settings (Password, Theme, Delete)", colors.amberSoft, colors.amberAccent) { onNavigate("settings") }
@@ -145,7 +145,7 @@ fun ProfileScreen(
 
         // Legal Pages Card
         item {
-            PRCard(cornerRadius = 20.dp, contentPadding = PaddingValues(vertical = 6.dp)) {
+            PRCard(cornerRadius = 16.dp, contentPadding = PaddingValues(vertical = 6.dp)) {
                 ProfileMenuRow(Icons.Rounded.Info, "About PlayReward", colors.inputBg, colors.textSecondary) { onNavigate("legal/about") }
                 HorizontalDivider(color = colors.cardBorder, modifier = Modifier.padding(horizontal = 16.dp))
                 ProfileMenuRow(Icons.Rounded.Description, "Terms & Conditions", colors.inputBg, colors.textSecondary) { onNavigate("legal/terms") }
@@ -214,8 +214,8 @@ private fun ProfileDetailPill(label: String, value: String, modifier: Modifier =
 private fun ProfileStatTile(label: String, value: String, icon: ImageVector, tint: Color, bg: Color, modifier: Modifier = Modifier) {
     val colors = PRTheme.colors
     Surface(modifier = modifier, shape = RoundedCornerShape(16.dp), color = colors.inputBg, border = BorderStroke(1.dp, colors.cardBorder)) {
-        Column(modifier = Modifier.padding(14.dp)) {
-            IconBadge(icon, bg, tint, size = 36.dp, cornerRadius = 10.dp)
+        Column(modifier = Modifier.padding(11.dp)) {
+            IconBadge(icon, bg, tint, size = 32.dp, cornerRadius = 10.dp)
             Spacer(Modifier.height(10.dp))
             Text(value, style = MaterialTheme.typography.titleLarge, color = colors.textPrimary)
             Text(label, style = MaterialTheme.typography.labelSmall, color = colors.textSecondary)
@@ -256,7 +256,7 @@ fun EditProfileScreen(viewModel: MainViewModel, onBack: () -> Unit) {
             IconButton(onClick = onBack) { Icon(Icons.Rounded.ArrowBackIosNew, null, tint = colors.textPrimary, modifier = Modifier.size(20.dp)) }
             Text("Edit Profile", style = MaterialTheme.typography.titleLarge, color = colors.textPrimary)
         }
-        PRCard(cornerRadius = 20.dp) {
+        PRCard(cornerRadius = 16.dp) {
             PRTextField(value = profile?.email ?: "", onValueChange = {}, label = "Email ID (Cannot be changed)", enabled = false, leadingIcon = Icons.Rounded.Email)
             Spacer(Modifier.height(12.dp))
             PRTextField(value = fullName, onValueChange = { fullName = it }, label = "Full Name", leadingIcon = Icons.Rounded.Person)
@@ -338,7 +338,7 @@ fun SettingsScreen(viewModel: MainViewModel, onBack: () -> Unit) {
 
         // Theme Mode (Light / Dark / System)
         item {
-            PRCard(cornerRadius = 20.dp) {
+            PRCard(cornerRadius = 16.dp) {
                 Text("Appearance & Theme", style = MaterialTheme.typography.titleMedium, color = colors.textPrimary)
                 Spacer(Modifier.height(10.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
@@ -356,7 +356,7 @@ fun SettingsScreen(viewModel: MainViewModel, onBack: () -> Unit) {
 
         // Change Password
         item {
-            PRCard(cornerRadius = 20.dp) {
+            PRCard(cornerRadius = 16.dp) {
                 Text("Change Password", style = MaterialTheme.typography.titleMedium, color = colors.textPrimary)
                 Spacer(Modifier.height(12.dp))
                 PRTextField(value = oldPass, onValueChange = { oldPass = it }, label = "Current Password", visualTransformation = PasswordVisualTransformation(), leadingIcon = Icons.Rounded.Lock)
@@ -389,7 +389,7 @@ fun SettingsScreen(viewModel: MainViewModel, onBack: () -> Unit) {
 
         // Delete Account (7-Day Grace Period)
         item {
-            PRCard(cornerRadius = 20.dp) {
+            PRCard(cornerRadius = 16.dp) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     IconBadge(Icons.Rounded.DeleteForever, colors.roseSoft, colors.roseAccent, size = 40.dp)
                     Spacer(Modifier.width(10.dp))
@@ -407,7 +407,7 @@ fun SettingsScreen(viewModel: MainViewModel, onBack: () -> Unit) {
                         color = colors.roseSoft,
                         border = BorderStroke(1.dp, colors.roseBorder)
                     ) {
-                        Column(modifier = Modifier.padding(14.dp)) {
+                        Column(modifier = Modifier.padding(11.dp)) {
                             Text("Account Scheduled for Deletion", fontWeight = FontWeight.Bold, color = colors.roseAccent)
                             Spacer(Modifier.height(4.dp))
                             Text("$daysToPermanentDelete days left to recover your account before all data is permanently deleted.", style = MaterialTheme.typography.bodyMedium, color = colors.textPrimary)
@@ -498,7 +498,7 @@ fun LegalPageScreen(pageType: String, viewModel: MainViewModel, onBack: () -> Un
             }
         }
         item {
-            PRCard(cornerRadius = 20.dp) {
+            PRCard(cornerRadius = 16.dp) {
                 Text(body, style = MaterialTheme.typography.bodyLarge, color = colors.textPrimary)
             }
         }

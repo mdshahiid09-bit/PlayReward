@@ -57,14 +57,14 @@ fun PlayAndEarnScreen(
     val progress = (currentGems.toFloat() / goal.toFloat()).coerceIn(0f, 1f)
     val canClaim = currentGems >= goal
 
-    Box(modifier = Modifier.fillMaxSize().background(colors.canvas)) {
+    Box(modifier = Modifier.fillMaxSize().background(colors.canvas).statusBarsPadding()) {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            contentPadding = PaddingValues(14.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             item {
-                Column(modifier = Modifier.statusBarsPadding()) {
+                Column {
                     Text("Play & Earn", style = MaterialTheme.typography.headlineMedium, color = colors.textPrimary)
                     Text("Answer quizzes, explore to collect gems, and claim coins", style = MaterialTheme.typography.bodyMedium, color = colors.textSecondary)
                 }
@@ -72,7 +72,7 @@ fun PlayAndEarnScreen(
 
             // Gem Goal Progress Card
             item {
-                PRCard(cornerRadius = 22.dp, contentPadding = PaddingValues(18.dp)) {
+                PRCard(cornerRadius = 16.dp, contentPadding = PaddingValues(14.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
                         Box(
                             modifier = Modifier.size(48.dp).clip(RoundedCornerShape(14.dp)).background(colors.lavenderSoft),

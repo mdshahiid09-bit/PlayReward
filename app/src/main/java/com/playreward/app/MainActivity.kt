@@ -189,7 +189,7 @@ private fun PlayRewardRoot(vm: MainViewModel, onExitApp: () -> Unit) {
                                     navController.navigate(route) { launchSingleTop = true }
                                 }
 
-                                DrawerNavItem(Icons.Rounded.Home, "Home") { goDrawer("home") }
+                                DrawerNavItem(Icons.Rounded.Home, "Home") { scope.launch { drawerState.close() }; navController.popBackStack("home", inclusive = false) }
                                 DrawerNavItem(Icons.Rounded.TaskAlt, "Tasks") { goDrawer("tasks") }
                                 DrawerNavItem(Icons.Rounded.History, "Task History") { goDrawer("task_history") }
                                 DrawerNavItem(Icons.Rounded.Quiz, "Play & Earn") { goDrawer("play") }
@@ -226,7 +226,7 @@ private fun PlayRewardRoot(vm: MainViewModel, onExitApp: () -> Unit) {
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .navigationBarsPadding()
-                                            .padding(horizontal = 6.dp, vertical = 8.dp),
+                                            .padding(horizontal = 6.dp, vertical = 6.dp),
                                         horizontalArrangement = Arrangement.SpaceAround,
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
@@ -238,10 +238,20 @@ private fun PlayRewardRoot(vm: MainViewModel, onExitApp: () -> Unit) {
                                                     .clip(RoundedCornerShape(14.dp))
                                                     .clickable {
                                                         if (currentRoute != tab.route) {
-                                                            navController.navigate(tab.route) {
-                                                                popUpTo("home") { saveState = true }
-                                                                launchSingleTop = true
-                                                                restoreState = true
+                                                            if (tab.route == "home") {
+                                                                val popped = navController.popBackStack("home", inclusive = false)
+                                                                if (!popped) {
+                                                                    navController.navigate("home") {
+                                                                        popUpTo(navController.graph.startDestinationId) { inclusive = true }
+                                                                        launchSingleTop = true
+                                                                    }
+                                                                }
+                                                            } else {
+                                                                navController.navigate(tab.route) {
+                                                                    popUpTo(navController.graph.startDestinationId) { saveState = true }
+                                                                    launchSingleTop = true
+                                                                    restoreState = true
+                                                                }
                                                             }
                                                         }
                                                     }
@@ -251,7 +261,7 @@ private fun PlayRewardRoot(vm: MainViewModel, onExitApp: () -> Unit) {
                                                 if (isHome) {
                                                     Box(
                                                         modifier = Modifier
-                                                            .size(40.dp)
+                                                            .size(34.dp)
                                                             .clip(CircleShape)
                                                             .background(if (selected) colors.heroGradient else androidx.compose.ui.graphics.Brush.linearGradient(listOf(colors.lavenderSoft, colors.lavenderSoft))),
                                                         contentAlignment = Alignment.Center

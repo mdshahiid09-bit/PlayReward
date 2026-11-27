@@ -64,14 +64,14 @@ fun TasksScreen(
     val pagedTasks = remember(availableTasks, visibleCount) { availableTasks.take(visibleCount) }
 
     LazyColumn(
-        modifier = Modifier.fillMaxSize().background(colors.canvas),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
+        modifier = Modifier.fillMaxSize().background(colors.canvas).statusBarsPadding(),
+        contentPadding = PaddingValues(14.dp),
+        verticalArrangement = Arrangement.spacedBy(11.dp)
     ) {
         // Header Row + History Icon
         item {
             Row(
-                modifier = Modifier.fillMaxWidth().statusBarsPadding(),
+                modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
@@ -103,7 +103,7 @@ fun TasksScreen(
         // Admin-Managed Tasks Banner Card
         item {
             Box(
-                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(colors.heroGradient).padding(18.dp)
+                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(colors.heroGradient).padding(14.dp)
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(modifier = Modifier.weight(1f)) {

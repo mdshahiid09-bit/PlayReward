@@ -55,14 +55,14 @@ fun WalletScreen(
     val convertedInrPreview = convertCoins.toDouble() / coinsPerInr.toDouble()
 
     LazyColumn(
-        modifier = Modifier.fillMaxSize().background(colors.canvas),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        modifier = Modifier.fillMaxSize().background(colors.canvas).statusBarsPadding(),
+        contentPadding = PaddingValues(14.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         // Header + Payout Settings Gear
         item {
             Row(
-                modifier = Modifier.fillMaxWidth().statusBarsPadding(),
+                modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
@@ -86,7 +86,7 @@ fun WalletScreen(
         // Hero Indigo-Violet Balance Card (Reference Video 00:52)
         item {
             Box(
-                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp)).background(colors.heroGradient).padding(22.dp)
+                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(colors.heroGradient).padding(16.dp)
             ) {
                 Column {
                     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
@@ -122,7 +122,7 @@ fun WalletScreen(
 
         // Convert Coins to INR Card (Min 10,000, Max Infinity)
         item {
-            PRCard(cornerRadius = 20.dp) {
+            PRCard(cornerRadius = 16.dp) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     IconBadge(Icons.Rounded.CurrencyExchange, colors.lavenderSoft, colors.primaryIndigo, size = 40.dp)
                     Spacer(Modifier.width(10.dp))
@@ -174,7 +174,7 @@ fun WalletScreen(
 
         // Withdraw Request Card
         item {
-            PRCard(cornerRadius = 20.dp) {
+            PRCard(cornerRadius = 16.dp) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -320,7 +320,7 @@ fun PayoutSettingsScreen(
         }
 
         item {
-            PRCard(cornerRadius = 20.dp) {
+            PRCard(cornerRadius = 16.dp) {
                 Text("UPI Details", style = MaterialTheme.typography.titleMedium, color = colors.textPrimary)
                 Spacer(Modifier.height(10.dp))
                 PRTextField(
@@ -334,7 +334,7 @@ fun PayoutSettingsScreen(
         }
 
         item {
-            PRCard(cornerRadius = 20.dp) {
+            PRCard(cornerRadius = 16.dp) {
                 Text("Bank Transfer Details", style = MaterialTheme.typography.titleMedium, color = colors.textPrimary)
                 Spacer(Modifier.height(10.dp))
                 PRTextField(value = holder, onValueChange = { holder = it }, label = "Account Holder Name", leadingIcon = Icons.Rounded.Person)

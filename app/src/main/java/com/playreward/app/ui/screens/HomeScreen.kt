@@ -62,17 +62,16 @@ fun HomeScreen(
     }
 
     LazyColumn(
-        modifier = Modifier.fillMaxSize().background(colors.canvas),
+        modifier = Modifier.fillMaxSize().background(colors.canvas).statusBarsPadding(),
         contentPadding = PaddingValues(bottom = 28.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         // Header: Left Menu Slider + App Name; Right Notifications, Leaderboard, Profile
         item {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .statusBarsPadding()
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                    .padding(horizontal = 14.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Surface(
@@ -166,7 +165,7 @@ fun HomeScreen(
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(152.dp)
+                                .height(132.dp)
                                 .clip(RoundedCornerShape(22.dp))
                                 .background(colors.heroGradient)
                                 .bounceClick {
@@ -221,8 +220,8 @@ fun HomeScreen(
         item {
             PRCard(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-                cornerRadius = 22.dp,
-                contentPadding = PaddingValues(18.dp)
+                cornerRadius = 16.dp,
+                contentPadding = PaddingValues(14.dp)
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
                     Box(
@@ -267,10 +266,10 @@ fun HomeScreen(
             ) {
                 PRCard(
                     modifier = Modifier.weight(1f),
-                    cornerRadius = 20.dp,
+                    cornerRadius = 16.dp,
                     onClick = { onNavigate("refer") }
                 ) {
-                    IconBadge(Icons.Rounded.CardGiftcard, colors.lavenderSoft, colors.primaryViolet, size = 44.dp)
+                    IconBadge(Icons.Rounded.CardGiftcard, colors.lavenderSoft, colors.primaryViolet, size = 38.dp)
                     Spacer(Modifier.height(12.dp))
                     Text("Refer & Earn", style = MaterialTheme.typography.titleMedium, color = colors.textPrimary)
                     Spacer(Modifier.height(4.dp))
@@ -284,10 +283,10 @@ fun HomeScreen(
 
                 PRCard(
                     modifier = Modifier.weight(1f),
-                    cornerRadius = 20.dp,
+                    cornerRadius = 16.dp,
                     onClick = { onNavigate("play") }
                 ) {
-                    IconBadge(Icons.Rounded.Quiz, colors.amberSoft, colors.amberAccent, size = 44.dp)
+                    IconBadge(Icons.Rounded.Quiz, colors.amberSoft, colors.amberAccent, size = 38.dp)
                     Spacer(Modifier.height(12.dp))
                     Text("Play & Earn", style = MaterialTheme.typography.titleMedium, color = colors.textPrimary)
                     Spacer(Modifier.height(4.dp))
@@ -343,130 +342,85 @@ fun HomeScreen(
             }
         }
 
-        // Big Gradient Cards: Mega Offer (Find the Correct Number) + Super Offer (Tic Tac Toe)
-        item {
-            Column(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp)
-            ) {
-                // 1. Mega Offer Card
-                if (megaConfig.enabled) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(24.dp))
-                            .background(colors.megaGradient)
-                            .bounceClick { onNavigate("mega_offer") }
-                            .padding(20.dp)
-                    ) {
-                        Column {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Surface(shape = CircleShape, color = Color.White.copy(alpha = 0.22f)) {
-                                    Text(
-                                        text = "MEGA OFFER",
-                                        color = Color.White,
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 11.sp,
-                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                                    )
-                                }
+        // Side-by-Side Gradient Cards: Mega Offer & Super Offer (Reference Video Proportions)
+        if (megaConfig.enabled || superConfig.enabled) {
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    if (megaConfig.enabled) {
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(18.dp))
+                                .background(colors.megaGradient)
+                                .bounceClick { onNavigate("mega_offer") }
+                                .padding(14.dp)
+                        ) {
+                            Column {
                                 Surface(shape = CircleShape, color = Color(0xFFFEF3C7)) {
                                     Text(
                                         text = "MOST PAID",
                                         color = Color(0xFFB45309),
                                         fontWeight = FontWeight.ExtraBold,
-                                        fontSize = 10.5.sp,
-                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                                        fontSize = 9.5.sp,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
                                     )
                                 }
-                            }
-                            Spacer(Modifier.height(14.dp))
-                            Text(megaConfig.title, color = Color.White, style = MaterialTheme.typography.headlineMedium)
-                            Spacer(Modifier.height(4.dp))
-                            Text(megaConfig.subtitle, color = Color.White.copy(alpha = 0.92f), style = MaterialTheme.typography.bodyMedium)
-                            Spacer(Modifier.height(16.dp))
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Column {
-                                    Text("Guaranteed Reward", color = Color.White.copy(alpha = 0.85f), fontSize = 12.sp)
-                                    Text("${megaConfig.rewardCoins} Coins", color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 22.sp)
-                                }
+                                Spacer(Modifier.height(8.dp))
+                                Text(megaConfig.title, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Spacer(Modifier.height(4.dp))
+                                Text("Guaranteed", color = Color.White.copy(alpha = 0.85f), fontSize = 11.sp)
+                                Text("${megaConfig.rewardCoins}", color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 24.sp)
+                                Text("Coins", color = Color.White.copy(alpha = 0.9f), fontSize = 11.5.sp)
+                                Spacer(Modifier.height(10.dp))
                                 Surface(shape = CircleShape, color = Color.White) {
                                     Row(
-                                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                                        modifier = Modifier.padding(horizontal = 11.dp, vertical = 6.dp),
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        Text("Play Now", color = Color(0xFFEA580C), fontWeight = FontWeight.Bold, fontSize = 13.5.sp)
-                                        Spacer(Modifier.width(4.dp))
-                                        Icon(Icons.Rounded.ChevronRight, null, tint = Color(0xFFEA580C), modifier = Modifier.size(18.dp))
+                                        Text("Play Now", color = Color(0xFFEA580C), fontWeight = FontWeight.Bold, fontSize = 11.5.sp)
+                                        Icon(Icons.Rounded.ChevronRight, null, tint = Color(0xFFEA580C), modifier = Modifier.size(14.dp))
                                     }
                                 }
                             }
                         }
                     }
-                }
-
-                // 2. Super Offer Card (Tic Tac Toe 1v1 AI)
-                if (superConfig.enabled) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(24.dp))
-                            .background(colors.superGradient)
-                            .bounceClick { onNavigate("super_offer") }
-                            .padding(20.dp)
-                    ) {
-                        Column {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
+                    if (superConfig.enabled) {
+                        val topWin = superConfig.tiers.maxOfOrNull { it.winCoins } ?: 950L
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(18.dp))
+                                .background(colors.superGradient)
+                                .bounceClick { onNavigate("super_offer") }
+                                .padding(14.dp)
+                        ) {
+                            Column {
                                 Surface(shape = CircleShape, color = Color.White.copy(alpha = 0.22f)) {
                                     Text(
-                                        text = "SUPER OFFER",
+                                        text = "1v1 AI GAME",
                                         color = Color.White,
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 11.sp,
-                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                                        fontWeight = FontWeight.ExtraBold,
+                                        fontSize = 9.5.sp,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
                                     )
                                 }
-                                Icon(Icons.Rounded.Grid3x3, null, tint = Color.White, modifier = Modifier.size(24.dp))
-                            }
-                            Spacer(Modifier.height(14.dp))
-                            Text(superConfig.title, color = Color.White, style = MaterialTheme.typography.headlineMedium)
-                            Spacer(Modifier.height(4.dp))
-                            Text(
-                                text = "1v1 AI Tic-Tac-Toe Arena — pick your stake & difficulty and win multiplied coins!",
-                                color = Color.White.copy(alpha = 0.92f),
-                                style = MaterialTheme.typography.bodyMedium
-                            )
-                            Spacer(Modifier.height(16.dp))
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                val topWin = superConfig.tiers.maxOfOrNull { it.winCoins } ?: 950L
-                                Column {
-                                    Text("Win Up To", color = Color.White.copy(alpha = 0.85f), fontSize = 12.sp)
-                                    Text("$topWin Coins", color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 22.sp)
-                                }
+                                Spacer(Modifier.height(8.dp))
+                                Text("Super Offer", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Spacer(Modifier.height(4.dp))
+                                Text("Win Up To", color = Color.White.copy(alpha = 0.85f), fontSize = 11.sp)
+                                Text("$topWin", color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 24.sp)
+                                Text("Coins", color = Color.White.copy(alpha = 0.9f), fontSize = 11.5.sp)
+                                Spacer(Modifier.height(10.dp))
                                 Surface(shape = CircleShape, color = Color.White) {
                                     Row(
-                                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                                        modifier = Modifier.padding(horizontal = 11.dp, vertical = 6.dp),
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        Text("Enter Arena", color = Color(0xFF4F46E5), fontWeight = FontWeight.Bold, fontSize = 13.5.sp)
-                                        Spacer(Modifier.width(4.dp))
-                                        Icon(Icons.Rounded.ChevronRight, null, tint = Color(0xFF4F46E5), modifier = Modifier.size(18.dp))
+                                        Text("Enter Arena", color = Color(0xFF4F46E5), fontWeight = FontWeight.Bold, fontSize = 11.5.sp)
+                                        Icon(Icons.Rounded.ChevronRight, null, tint = Color(0xFF4F46E5), modifier = Modifier.size(14.dp))
                                     }
                                 }
                             }

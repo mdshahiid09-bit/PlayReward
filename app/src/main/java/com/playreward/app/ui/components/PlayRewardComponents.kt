@@ -98,8 +98,8 @@ fun Modifier.bounceClick(
 @Composable
 fun PRCard(
     modifier: Modifier = Modifier,
-    cornerRadius: Dp = 18.dp,
-    contentPadding: PaddingValues = PaddingValues(16.dp),
+    cornerRadius: Dp = 16.dp,
+    contentPadding: PaddingValues = PaddingValues(13.dp),
     onClick: (() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit
 ) {
@@ -127,8 +127,8 @@ fun PrimaryGradientButton(
     isLoading: Boolean = false,
     leadingIcon: ImageVector? = null,
     gradient: Brush? = null,
-    height: Dp = 52.dp,
-    cornerRadius: Dp = 16.dp
+    height: Dp = 46.dp,
+    cornerRadius: Dp = 14.dp
 ) {
     val colors = PRTheme.colors
     val brush = gradient ?: colors.heroGradient
@@ -187,7 +187,7 @@ fun SecondaryOutlineButton(
     enabled: Boolean = true,
     isLoading: Boolean = false,
     leadingIcon: ImageVector? = null,
-    height: Dp = 50.dp
+    height: Dp = 44.dp
 ) {
     val colors = PRTheme.colors
     OutlinedButton(
