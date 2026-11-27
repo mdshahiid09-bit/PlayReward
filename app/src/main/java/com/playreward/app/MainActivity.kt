@@ -323,7 +323,21 @@ private fun PlayRewardRoot(vm: MainViewModel, onExitApp: () -> Unit) {
                                 MegaOfferScreen(viewModel = vm, onBack = { navController.popBackStack() })
                             }
                             composable("super_offer") {
-                                SuperOfferTicTacToeScreen(viewModel = vm, onBack = { navController.popBackStack() })
+                                SuperOfferTicTacToeScreen(
+                                    viewModel = vm,
+                                    onBack = { navController.popBackStack() },
+                                    onEnterMatch = { tierId -> navController.navigate("tictactoe_match/$tierId") }
+                                )
+                            }
+                            composable(
+                                "tictactoe_match/{tierId}",
+                                arguments = listOf(navArgument("tierId") { type = NavType.StringType })
+                            ) {
+                                TicTacToeMatchScreen(
+                                    tierId = it.arguments?.getString("tierId").orEmpty(),
+                                    viewModel = vm,
+                                    onExitToLobby = { navController.popBackStack() }
+                                )
                             }
                             composable("refer") {
                                 ReferAndEarnScreen(
