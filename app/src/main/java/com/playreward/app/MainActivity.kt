@@ -1,6 +1,7 @@
 package com.playreward.app
 
 import android.Manifest
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -24,6 +25,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -37,7 +39,7 @@ import androidx.navigation.NavType
 import androidx.navigation.compose.*
 import androidx.navigation.navArgument
 import com.playreward.app.ui.components.FloatingToast
-import com.playreward.app.ui.components.IconBadge
+import com.playreward.app.ui.components.ToastType
 import com.playreward.app.ui.screens.*
 import com.playreward.app.ui.theme.PRTheme
 import com.playreward.app.ui.theme.PlayRewardTheme
@@ -142,7 +144,6 @@ private fun PlayRewardRoot(vm: MainViewModel, onExitApp: () -> Unit) {
                 val navBackStack by navController.currentBackStackEntryAsState()
                 val currentRoute = navBackStack?.destination?.route ?: "home"
 
-                // Exact 5-Tab Bottom Navigation Bar requested by user
                 val bottomTabs = remember {
                     listOf(
                         BottomTab("tasks", "Tasks", Icons.Rounded.TaskAlt),
@@ -153,6 +154,33 @@ private fun PlayRewardRoot(vm: MainViewModel, onExitApp: () -> Unit) {
                     )
                 }
                 val topLevelRoutes = remember { bottomTabs.map { it.route }.toSet() }
+
+                // Zero-bug tab navigation: never uses saveState/restoreState so Home ALWAYS works instantly
+                fun navigateToRoute(route: String) {
+                    if (route == currentRoute) return
+                    if (route == "home") {
+                        val popped = navController.popBackStack("home", inclusive = false)
+                        if (!popped) {
+                            navController.navigate("home") {
+                                popUpTo(0) { inclusive = true }
+                                launchSingleTop = true
+                            }
+                        }
+                    } else if (route in topLevelRoutes) {
+                        navController.navigate(route) {
+                            popUpTo("home") {
+                                inclusive = false
+                                saveState = false
+                            }
+                            launchSingleTop = true
+                            restoreState = false
+                        }
+                    } else {
+                        navController.navigate(route) {
+                            launchSingleTop = true
+                        }
+                    }
+                }
 
                 BackHandler(enabled = currentRoute == "home") {
                     showExitDialog = true
@@ -165,15 +193,14 @@ private fun PlayRewardRoot(vm: MainViewModel, onExitApp: () -> Unit) {
                             Column(
                                 modifier = Modifier
                                     .fillMaxHeight()
-                                    .width(290.dp)
+                                    .width(280.dp)
                                     .verticalScroll(rememberScrollState())
                                     .statusBarsPadding()
                                     .navigationBarsPadding()
-                                    .padding(16.dp)
+                                    .padding(14.dp)
                             ) {
-                                // Drawer Profile Header
                                 Box(
-                                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(colors.heroGradient).padding(18.dp)
+                                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(colors.heroGradient).padding(16.dp)
                                 ) {
                                     Column {
                                         Text("PlayReward", color = Color.White, style = MaterialTheme.typography.titleLarge)
@@ -182,14 +209,14 @@ private fun PlayRewardRoot(vm: MainViewModel, onExitApp: () -> Unit) {
                                         Text("${profile?.coins ?: 0} Coins • ₹${String.format("%.2f", profile?.inrBalance ?: 0.0)}", color = Color.White.copy(alpha = 0.85f), fontSize = 12.5.sp)
                                     }
                                 }
-                                Spacer(Modifier.height(16.dp))
+                                Spacer(Modifier.height(14.dp))
 
                                 fun goDrawer(route: String) {
                                     scope.launch { drawerState.close() }
-                                    navController.navigate(route) { launchSingleTop = true }
+                                    navigateToRoute(route)
                                 }
 
-                                DrawerNavItem(Icons.Rounded.Home, "Home") { scope.launch { drawerState.close() }; navController.popBackStack("home", inclusive = false) }
+                                DrawerNavItem(Icons.Rounded.Home, "Home") { goDrawer("home") }
                                 DrawerNavItem(Icons.Rounded.TaskAlt, "Tasks") { goDrawer("tasks") }
                                 DrawerNavItem(Icons.Rounded.History, "Task History") { goDrawer("task_history") }
                                 DrawerNavItem(Icons.Rounded.Quiz, "Play & Earn") { goDrawer("play") }
@@ -226,8 +253,7 @@ private fun PlayRewardRoot(vm: MainViewModel, onExitApp: () -> Unit) {
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .navigationBarsPadding()
-                                            .padding(horizontal = 6.dp, vertical = 6.dp),
-                                        horizontalArrangement = Arrangement.SpaceAround,
+                                            .padding(horizontal = 4.dp, vertical = 6.dp),
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         bottomTabs.forEach { tab ->
@@ -235,27 +261,10 @@ private fun PlayRewardRoot(vm: MainViewModel, onExitApp: () -> Unit) {
                                             val isHome = tab.route == "home"
                                             Column(
                                                 modifier = Modifier
-                                                    .clip(RoundedCornerShape(14.dp))
-                                                    .clickable {
-                                                        if (currentRoute != tab.route) {
-                                                            if (tab.route == "home") {
-                                                                val popped = navController.popBackStack("home", inclusive = false)
-                                                                if (!popped) {
-                                                                    navController.navigate("home") {
-                                                                        popUpTo(navController.graph.startDestinationId) { inclusive = true }
-                                                                        launchSingleTop = true
-                                                                    }
-                                                                }
-                                                            } else {
-                                                                navController.navigate(tab.route) {
-                                                                    popUpTo(navController.graph.startDestinationId) { saveState = true }
-                                                                    launchSingleTop = true
-                                                                    restoreState = true
-                                                                }
-                                                            }
-                                                        }
-                                                    }
-                                                    .padding(horizontal = 10.dp, vertical = 4.dp),
+                                                    .weight(1f)
+                                                    .clip(RoundedCornerShape(12.dp))
+                                                    .clickable { navigateToRoute(tab.route) }
+                                                    .padding(vertical = 4.dp),
                                                 horizontalAlignment = Alignment.CenterHorizontally
                                             ) {
                                                 if (isHome) {
@@ -263,23 +272,27 @@ private fun PlayRewardRoot(vm: MainViewModel, onExitApp: () -> Unit) {
                                                         modifier = Modifier
                                                             .size(34.dp)
                                                             .clip(CircleShape)
-                                                            .background(if (selected) colors.heroGradient else androidx.compose.ui.graphics.Brush.linearGradient(listOf(colors.lavenderSoft, colors.lavenderSoft))),
+                                                            .background(
+                                                                if (selected) colors.heroGradient
+                                                                else Brush.linearGradient(listOf(colors.lavenderSoft, colors.lavenderSoft))
+                                                            ),
                                                         contentAlignment = Alignment.Center
                                                     ) {
-                                                        Icon(tab.icon, tab.label, tint = if (selected) Color.White else colors.primaryIndigo, modifier = Modifier.size(22.dp))
+                                                        Icon(tab.icon, tab.label, tint = if (selected) Color.White else colors.primaryIndigo, modifier = Modifier.size(20.dp))
                                                     }
                                                 } else {
                                                     Icon(
                                                         tab.icon,
                                                         tab.label,
                                                         tint = if (selected) colors.primaryIndigo else colors.textSecondary,
-                                                        modifier = Modifier.size(23.dp)
+                                                        modifier = Modifier.size(22.dp)
                                                     )
                                                 }
                                                 Spacer(Modifier.height(2.dp))
                                                 Text(
                                                     text = tab.label,
-                                                    fontSize = 10.5.sp,
+                                                    fontSize = 10.sp,
+                                                    maxLines = 1,
                                                     fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
                                                     color = if (selected) colors.primaryIndigo else colors.textSecondary
                                                 )
@@ -299,20 +312,20 @@ private fun PlayRewardRoot(vm: MainViewModel, onExitApp: () -> Unit) {
                                 HomeScreen(
                                     viewModel = vm,
                                     onOpenDrawer = { scope.launch { drawerState.open() } },
-                                    onNavigate = { route -> navController.navigate(route) { launchSingleTop = true } },
-                                    onOpenTask = { id -> navController.navigate("task_detail/$id") }
+                                    onNavigate = { route -> navigateToRoute(route) },
+                                    onOpenTask = { id -> navController.navigate("task_detail/${Uri.encode(id)}") }
                                 )
                             }
                             composable("tasks") {
                                 TasksScreen(
                                     viewModel = vm,
-                                    onOpenTask = { id -> navController.navigate("task_detail/$id") },
+                                    onOpenTask = { id -> navController.navigate("task_detail/${Uri.encode(id)}") },
                                     onOpenHistory = { navController.navigate("task_history") }
                                 )
                             }
                             composable("task_detail/{taskId}", arguments = listOf(navArgument("taskId") { type = NavType.StringType })) {
                                 TaskDetailScreen(
-                                    taskId = it.arguments?.getString("taskId").orEmpty(),
+                                    taskId = Uri.decode(it.arguments?.getString("taskId").orEmpty()),
                                     viewModel = vm,
                                     onBack = { navController.popBackStack() }
                                 )
@@ -321,13 +334,15 @@ private fun PlayRewardRoot(vm: MainViewModel, onExitApp: () -> Unit) {
                                 TaskHistoryScreen(
                                     viewModel = vm,
                                     onBack = { navController.popBackStack() },
-                                    onOpenTask = { id -> navController.navigate("task_detail/$id") }
+                                    onOpenTask = { id -> navController.navigate("task_detail/${Uri.encode(id)}") }
                                 )
                             }
                             composable("play") {
                                 PlayAndEarnScreen(
                                     viewModel = vm,
-                                    onOpenCategory = { id, name -> navController.navigate("quiz_play/$id/$name") }
+                                    onOpenCategory = { id, name ->
+                                        navController.navigate("quiz_play/${Uri.encode(id)}/${Uri.encode(name)}")
+                                    }
                                 )
                             }
                             composable(
@@ -338,8 +353,8 @@ private fun PlayRewardRoot(vm: MainViewModel, onExitApp: () -> Unit) {
                                 )
                             ) {
                                 QuizPlayScreen(
-                                    categoryId = it.arguments?.getString("catId").orEmpty(),
-                                    categoryName = it.arguments?.getString("catName").orEmpty(),
+                                    categoryId = Uri.decode(it.arguments?.getString("catId").orEmpty()),
+                                    categoryName = Uri.decode(it.arguments?.getString("catName").orEmpty()),
                                     viewModel = vm,
                                     onBack = { navController.popBackStack() }
                                 )
@@ -351,7 +366,7 @@ private fun PlayRewardRoot(vm: MainViewModel, onExitApp: () -> Unit) {
                                 SuperOfferTicTacToeScreen(
                                     viewModel = vm,
                                     onBack = { navController.popBackStack() },
-                                    onEnterMatch = { tierId -> navController.navigate("tictactoe_match/$tierId") }
+                                    onEnterMatch = { tierId -> navController.navigate("tictactoe_match/${Uri.encode(tierId)}") }
                                 )
                             }
                             composable(
@@ -359,7 +374,7 @@ private fun PlayRewardRoot(vm: MainViewModel, onExitApp: () -> Unit) {
                                 arguments = listOf(navArgument("tierId") { type = NavType.StringType })
                             ) {
                                 TicTacToeMatchScreen(
-                                    tierId = it.arguments?.getString("tierId").orEmpty(),
+                                    tierId = Uri.decode(it.arguments?.getString("tierId").orEmpty()),
                                     viewModel = vm,
                                     onExitToLobby = { navController.popBackStack() }
                                 )
@@ -396,7 +411,7 @@ private fun PlayRewardRoot(vm: MainViewModel, onExitApp: () -> Unit) {
                             composable("profile") {
                                 ProfileScreen(
                                     viewModel = vm,
-                                    onNavigate = { route -> navController.navigate(route) { launchSingleTop = true } }
+                                    onNavigate = { route -> navigateToRoute(route) }
                                 )
                             }
                             composable("edit_profile") {
@@ -455,11 +470,11 @@ private fun PlayRewardRoot(vm: MainViewModel, onExitApp: () -> Unit) {
             }
         }
 
-        // Global Floating Toast (Reference Video Style)
+        // Global Floating Toast
         FloatingToast(
             message = toast?.message,
-            type = toast?.type ?: com.playreward.app.ui.components.ToastType.INFO,
-            modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 76.dp)
+            type = toast?.type ?: ToastType.INFO,
+            modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 70.dp)
         )
     }
 }
@@ -475,13 +490,13 @@ private fun DrawerNavItem(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
+            .clip(RoundedCornerShape(12.dp))
             .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 11.dp),
+            .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(icon, null, tint = tint ?: colors.primaryIndigo, modifier = Modifier.size(21.dp))
-        Spacer(Modifier.width(14.dp))
+        Icon(icon, null, tint = tint ?: colors.primaryIndigo, modifier = Modifier.size(20.dp))
+        Spacer(Modifier.width(12.dp))
         Text(label, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium, color = tint ?: colors.textPrimary)
     }
 }
