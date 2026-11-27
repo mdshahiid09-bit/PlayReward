@@ -23,6 +23,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -149,9 +150,10 @@ fun AuthFlowScreen(
             }
 
             Image(
-                painter = painterResource(R.drawable.ic_app_logo),
+                painter = painterResource(R.drawable.playreward_logo),
                 contentDescription = "PlayReward",
-                modifier = Modifier.size(if (mode == AuthMode.LANDING) 84.dp else 64.dp)
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.size(if (mode == AuthMode.LANDING) 96.dp else 72.dp).clip(RoundedCornerShape(22.dp))
             )
             Spacer(Modifier.height(14.dp))
             Text("PlayReward", style = MaterialTheme.typography.headlineMedium, color = colors.textPrimary)

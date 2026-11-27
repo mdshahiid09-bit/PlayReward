@@ -11,6 +11,9 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -203,8 +206,17 @@ private fun PlayRewardRoot(vm: MainViewModel, onExitApp: () -> Unit) {
                                     modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(colors.heroGradient).padding(16.dp)
                                 ) {
                                     Column {
-                                        Text("PlayReward", color = Color.White, style = MaterialTheme.typography.titleLarge)
-                                        Spacer(Modifier.height(4.dp))
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Image(
+                                                painter = painterResource(R.drawable.playreward_logo),
+                                                contentDescription = "PlayReward",
+                                                contentScale = ContentScale.Fit,
+                                                modifier = Modifier.size(38.dp).clip(RoundedCornerShape(10.dp))
+                                            )
+                                            Spacer(Modifier.width(10.dp))
+                                            Text("PlayReward", color = Color.White, style = MaterialTheme.typography.titleLarge)
+                                        }
+                                        Spacer(Modifier.height(8.dp))
                                         Text(profile?.fullName?.ifBlank { "Player" } ?: "Player", color = Color.White.copy(alpha = 0.92f), fontWeight = FontWeight.SemiBold)
                                         Text("${profile?.coins ?: 0} Coins • ₹${String.format("%.2f", profile?.inrBalance ?: 0.0)}", color = Color.White.copy(alpha = 0.85f), fontSize = 12.5.sp)
                                     }

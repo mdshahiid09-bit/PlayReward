@@ -62,9 +62,10 @@ fun SplashScreen(onFinished: () -> Unit) {
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Image(
-                painter = painterResource(R.drawable.ic_app_logo),
+                painter = painterResource(R.drawable.playreward_logo),
                 contentDescription = "PlayReward",
-                modifier = Modifier.size(96.dp).scale(scale.value)
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.size(112.dp).scale(scale.value).clip(RoundedCornerShape(26.dp))
             )
             Spacer(Modifier.height(20.dp))
             Text("PlayReward", style = MaterialTheme.typography.headlineLarge, color = colors.textPrimary)

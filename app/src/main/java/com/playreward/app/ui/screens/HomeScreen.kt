@@ -91,7 +91,14 @@ fun HomeScreen(
                         Icon(Icons.Rounded.Menu, contentDescription = "Menu", tint = colors.textPrimary)
                     }
                 }
-                Spacer(Modifier.width(12.dp))
+                Spacer(Modifier.width(10.dp))
+                Image(
+                    painter = painterResource(R.drawable.playreward_logo),
+                    contentDescription = "PlayReward",
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier.size(34.dp).clip(RoundedCornerShape(10.dp))
+                )
+                Spacer(Modifier.width(8.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text("PlayReward", style = MaterialTheme.typography.titleLarge, color = colors.textPrimary)
                     val firstName = profile?.fullName?.substringBefore(" ")?.ifBlank { "Player" } ?: "Player"
