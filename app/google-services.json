@@ -15,6 +15,14 @@
       },
       "oauth_client": [
         {
+          "client_id": "820831612931-j2pt7c3kujl1oa0jfm18ruvan48ebr2j.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.playreward.app",
+            "certificate_hash": "d3943feb6ed96c11f62c3b0ea72edd6418cc56dd"
+          }
+        },
+        {
           "client_id": "820831612931-vq2o4qrlefjq0rmmptfeaqrkqpsirqo3.apps.googleusercontent.com",
           "client_type": 3
         }
