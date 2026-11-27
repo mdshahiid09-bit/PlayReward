@@ -5,6 +5,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -33,33 +34,36 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+// ============================================================================
+// SCREEN 1: WALLET HUB (Compact Overview + Navigation to Dedicated Screens)
+// ============================================================================
+
 @Composable
 fun WalletScreen(
     viewModel: MainViewModel,
+    onOpenWithdraw: () -> Unit,
+    onOpenConvert: () -> Unit,
+    onOpenHistory: () -> Unit,
     onOpenPayoutSettings: () -> Unit
 ) {
     val colors = PRTheme.colors
-    val scope = rememberCoroutineScope()
     val profile by viewModel.userProfile.collectAsState()
     val appConfig by viewModel.appConfig.collectAsState()
     val transactions by viewModel.transactions.collectAsState()
 
-    var convertInput by remember { mutableStateOf("") }
-    var withdrawCoinsInput by remember { mutableStateOf("") }
-    var selectedMethod by remember { mutableStateOf("UPI") }
-    var converting by remember { mutableStateOf(false) }
-    var withdrawing by remember { mutableStateOf(false) }
-
     val coinsPerInr = appConfig.coinsPerInr.coerceAtLeast(1L)
-    val convertCoins = convertInput.toLongOrNull() ?: 0L
-    val convertedInrPreview = convertCoins.toDouble() / coinsPerInr.toDouble()
+    val pm = profile?.payoutMethods ?: PayoutMethods()
+    val payoutSummary = buildList {
+        if (pm.upiId.isNotBlank()) add("UPI ready")
+        if (pm.bankAccountNumber.isNotBlank()) add("Bank ready")
+    }.joinToString(" • ").ifBlank { "Tap to add UPI or Bank details" }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize().background(colors.canvas).statusBarsPadding(),
         contentPadding = PaddingValues(14.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        // Header + Payout Settings Gear
+        // Header + Settings Icon
         item {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -67,23 +71,23 @@ fun WalletScreen(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Column {
-                    Text("Your Balance", style = MaterialTheme.typography.headlineMedium, color = colors.textPrimary)
-                    Text("Manage earnings, convert coins & withdraw", style = MaterialTheme.typography.bodyMedium, color = colors.textSecondary)
+                    Text("Your Wallet", style = MaterialTheme.typography.headlineMedium, color = colors.textPrimary)
+                    Text("Manage coins, INR & withdrawals", style = MaterialTheme.typography.bodyMedium, color = colors.textSecondary)
                 }
                 Surface(
-                    modifier = Modifier.size(44.dp).bounceClick(onClick = onOpenPayoutSettings),
-                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier.size(40.dp).bounceClick(onClick = onOpenPayoutSettings),
+                    shape = RoundedCornerShape(12.dp),
                     color = colors.card,
                     border = BorderStroke(1.dp, colors.cardBorder)
                 ) {
                     Box(contentAlignment = Alignment.Center) {
-                        Icon(Icons.Rounded.Settings, "Payout Settings", tint = colors.primaryIndigo)
+                        Icon(Icons.Rounded.Settings, "Payout Settings", tint = colors.primaryIndigo, modifier = Modifier.size(20.dp))
                     }
                 }
             }
         }
 
-        // Hero Indigo-Violet Balance Card (Reference Video 00:52)
+        // Hero Indigo-Violet Balance Card
         item {
             Box(
                 modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(colors.heroGradient).padding(16.dp)
@@ -91,169 +95,476 @@ fun WalletScreen(
                 Column {
                     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
                         Box(
-                            modifier = Modifier.size(46.dp).clip(RoundedCornerShape(14.dp)).background(Color.White.copy(alpha = 0.2f)),
+                            modifier = Modifier.size(42.dp).clip(RoundedCornerShape(12.dp)).background(Color.White.copy(alpha = 0.2f)),
                             contentAlignment = Alignment.Center
                         ) {
-                            Image(painterResource(R.drawable.ic_coin), null, modifier = Modifier.size(28.dp))
+                            Image(painterResource(R.drawable.ic_coin), null, modifier = Modifier.size(26.dp))
                         }
-                        Spacer(Modifier.width(14.dp))
+                        Spacer(Modifier.width(12.dp))
                         Column(modifier = Modifier.weight(1f)) {
-                            Text("Available Coins", color = Color.White.copy(alpha = 0.85f), fontSize = 13.sp)
-                            Text("${profile?.coins ?: 0}", color = Color.White, fontSize = 32.sp, fontWeight = FontWeight.ExtraBold)
+                            Text("Available Coins", color = Color.White.copy(alpha = 0.85f), fontSize = 12.sp)
+                            Text("${profile?.coins ?: 0}", color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.ExtraBold)
                         }
-                        Surface(shape = CircleShape, color = Color.White.copy(alpha = 0.2f)) {
+                        Surface(shape = CircleShape, color = Color.White.copy(alpha = 0.22f)) {
                             Text(
                                 text = "₹${String.format("%.2f", profile?.inrBalance ?: 0.0)}",
                                 color = Color.White,
                                 fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)
+                                fontSize = 14.sp,
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
                             )
                         }
                     }
-                    Spacer(Modifier.height(14.dp))
+                    Spacer(Modifier.height(10.dp))
                     Text(
-                        text = "Rate: $coinsPerInr Coins = ₹1 INR  •  Min Withdraw: ${appConfig.minWithdrawalCoins} Coins",
-                        color = Color.White.copy(alpha = 0.85f),
-                        fontSize = 12.sp
+                        text = "$coinsPerInr Coins = ₹1 INR  •  Min Withdraw: ${appConfig.minWithdrawalCoins} Coins",
+                        color = Color.White.copy(alpha = 0.86f),
+                        fontSize = 11.5.sp
                     )
                 }
             }
         }
 
-        // Convert Coins to INR Card (Min 10,000, Max Infinity)
+        // 2-Column Dedicated Action Cards: Withdraw & Convert Coins
         item {
-            PRCard(cornerRadius = 16.dp) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconBadge(Icons.Rounded.CurrencyExchange, colors.lavenderSoft, colors.primaryIndigo, size = 40.dp)
-                    Spacer(Modifier.width(10.dp))
-                    Column {
-                        Text("Convert Coins to INR", style = MaterialTheme.typography.titleMedium, color = colors.textPrimary)
-                        Text("Minimum ${appConfig.minConvertCoins} coins • No maximum limit", style = MaterialTheme.typography.labelSmall, color = colors.textSecondary)
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+                PRCard(
+                    modifier = Modifier.weight(1f),
+                    cornerRadius = 16.dp,
+                    contentPadding = PaddingValues(14.dp),
+                    onClick = onOpenWithdraw
+                ) {
+                    IconBadge(Icons.Rounded.AccountBalanceWallet, colors.amberSoft, colors.amberAccent, size = 38.dp, cornerRadius = 12.dp)
+                    Spacer(Modifier.height(10.dp))
+                    Text("Withdraw", style = MaterialTheme.typography.titleMedium, color = colors.textPrimary)
+                    Text("UPI & Bank Transfer", style = MaterialTheme.typography.labelSmall, color = colors.textSecondary)
+                }
+
+                PRCard(
+                    modifier = Modifier.weight(1f),
+                    cornerRadius = 16.dp,
+                    contentPadding = PaddingValues(14.dp),
+                    onClick = onOpenConvert
+                ) {
+                    IconBadge(Icons.Rounded.CurrencyExchange, colors.lavenderSoft, colors.primaryIndigo, size = 38.dp, cornerRadius = 12.dp)
+                    Spacer(Modifier.height(10.dp))
+                    Text("Convert Coins", style = MaterialTheme.typography.titleMedium, color = colors.textPrimary)
+                    Text("Coins to INR", style = MaterialTheme.typography.labelSmall, color = colors.textSecondary)
+                }
+            }
+        }
+
+        // Payout Methods & Full History Navigation Rows
+        item {
+            PRCard(cornerRadius = 16.dp, contentPadding = PaddingValues(13.dp), onClick = onOpenPayoutSettings) {
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                    IconBadge(Icons.Rounded.AccountBalance, colors.mintSoft, colors.mintAccent, size = 38.dp, cornerRadius = 11.dp)
+                    Spacer(Modifier.width(12.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Payout Methods", style = MaterialTheme.typography.titleMedium, color = colors.textPrimary)
+                        Text(payoutSummary, style = MaterialTheme.typography.labelSmall, color = colors.textSecondary)
+                    }
+                    Icon(Icons.Rounded.ChevronRight, null, tint = colors.textSecondary, modifier = Modifier.size(20.dp))
+                }
+            }
+        }
+
+        // Recent Transactions Preview + View All
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("Recent Activity", style = MaterialTheme.typography.titleMedium, color = colors.textPrimary)
+                TextButton(onClick = onOpenHistory) {
+                    Text("View all", color = colors.primaryIndigo, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                    Icon(Icons.Rounded.ChevronRight, null, tint = colors.primaryIndigo, modifier = Modifier.size(16.dp))
+                }
+            }
+        }
+
+        if (transactions.isEmpty()) {
+            item {
+                PRCard(cornerRadius = 16.dp, contentPadding = PaddingValues(14.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        IconBadge(Icons.Rounded.ReceiptLong, colors.lavenderSoft, colors.primaryIndigo, size = 38.dp)
+                        Spacer(Modifier.width(12.dp))
+                        Column {
+                            Text("No Transactions Yet", style = MaterialTheme.typography.titleMedium, color = colors.textPrimary)
+                            Text("Your earnings, conversions & withdrawals appear here.", style = MaterialTheme.typography.labelSmall, color = colors.textSecondary)
+                        }
                     }
                 }
-                Spacer(Modifier.height(12.dp))
-                PRTextField(
-                    value = convertInput,
-                    onValueChange = { convertInput = it.filter { c -> c.isDigit() } },
-                    label = "Coins to Convert",
-                    placeholder = "e.g. 10000",
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
-                )
-                if (convertCoins > 0) {
-                    Spacer(Modifier.height(6.dp))
-                    Text(
-                        text = "You will receive ₹${String.format("%.2f", convertedInrPreview)} INR",
-                        color = colors.mintAccent,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 13.sp
+            }
+        } else {
+            items(transactions.take(4), key = { it.id }) { tx ->
+                TransactionRowCard(tx)
+            }
+        }
+    }
+}
+
+// ============================================================================
+// SCREEN 2: DEDICATED WITHDRAWAL SCREEN
+// ============================================================================
+
+@Composable
+fun WithdrawScreen(
+    viewModel: MainViewModel,
+    onBack: () -> Unit,
+    onOpenPayoutSettings: () -> Unit
+) {
+    val colors = PRTheme.colors
+    val scope = rememberCoroutineScope()
+    val profile by viewModel.userProfile.collectAsState()
+    val appConfig by viewModel.appConfig.collectAsState()
+
+    val pm = profile?.payoutMethods ?: PayoutMethods()
+    val coinsPerInr = appConfig.coinsPerInr.coerceAtLeast(1L)
+    var selectedMethod by remember { mutableStateOf("UPI") }
+    var withdrawInput by remember { mutableStateOf("") }
+    var showConfirm by remember { mutableStateOf(false) }
+    var submitting by remember { mutableStateOf(false) }
+
+    val enteredCoins = withdrawInput.toLongOrNull() ?: 0L
+    val estimatedInr = enteredCoins.toDouble() / coinsPerInr.toDouble()
+    val presets = remember(appConfig.minWithdrawalCoins, appConfig.maxWithdrawalCoins) {
+        listOf(10000L, 25000L, 50000L, 100000L)
+            .filter { it in appConfig.minWithdrawalCoins..appConfig.maxWithdrawalCoins }
+            .ifEmpty { listOf(appConfig.minWithdrawalCoins) }
+    }
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize().background(colors.canvas).statusBarsPadding().navigationBarsPadding(),
+        contentPadding = PaddingValues(14.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        item {
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                IconButton(onClick = onBack) { Icon(Icons.Rounded.ArrowBackIosNew, null, tint = colors.textPrimary, modifier = Modifier.size(20.dp)) }
+                Text("Withdraw Rewards", style = MaterialTheme.typography.titleLarge, color = colors.textPrimary, modifier = Modifier.weight(1f))
+                Surface(shape = CircleShape, color = colors.amberSoft) {
+                    Row(modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Image(painterResource(R.drawable.ic_coin), null, modifier = Modifier.size(15.dp))
+                        Spacer(Modifier.width(5.dp))
+                        Text("${profile?.coins ?: 0}", color = Color(0xFFB45309), fontWeight = FontWeight.ExtraBold, fontSize = 13.sp)
+                    }
+                }
+            }
+        }
+
+        // Payout Method Selection Cards
+        item {
+            PRCard(cornerRadius = 16.dp) {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    Text("Select Payout Method", style = MaterialTheme.typography.titleMedium, color = colors.textPrimary)
+                    TextButton(onClick = onOpenPayoutSettings) {
+                        Text("Edit", color = colors.primaryIndigo, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    }
+                }
+                Spacer(Modifier.height(6.dp))
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    PayoutOptionRow(
+                        title = "UPI Transfer",
+                        subtitle = pm.upiId.ifBlank { "Not added — tap Edit to save UPI ID" },
+                        icon = Icons.Rounded.QrCode2,
+                        selected = selectedMethod == "UPI",
+                        configured = pm.upiId.isNotBlank(),
+                        onClick = { selectedMethod = "UPI" }
+                    )
+                    val bankMask = if (pm.bankAccountNumber.length >= 4) "••••${pm.bankAccountNumber.takeLast(4)} (${pm.bankName.ifBlank { "Bank" }})" else "Not added — tap Edit to save Bank"
+                    PayoutOptionRow(
+                        title = "Bank Transfer",
+                        subtitle = bankMask,
+                        icon = Icons.Rounded.AccountBalance,
+                        selected = selectedMethod == "BANK",
+                        configured = pm.bankAccountNumber.isNotBlank() && pm.bankIfsc.isNotBlank(),
+                        onClick = { selectedMethod = "BANK" }
                     )
                 }
-                Spacer(Modifier.height(12.dp))
+            }
+        }
+
+        // Amount Selection Card
+        item {
+            PRCard(cornerRadius = 16.dp) {
+                Text("Withdrawal Amount", style = MaterialTheme.typography.titleMedium, color = colors.textPrimary)
+                Text("Min ${appConfig.minWithdrawalCoins} • Max ${appConfig.maxWithdrawalCoins} coins", style = MaterialTheme.typography.labelSmall, color = colors.textSecondary)
+                Spacer(Modifier.height(10.dp))
+
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(presets) { preset ->
+                        FilterChip(
+                            selected = enteredCoins == preset,
+                            onClick = { withdrawInput = preset.toString() },
+                            label = { Text("$preset", fontWeight = FontWeight.SemiBold) }
+                        )
+                    }
+                }
+                Spacer(Modifier.height(10.dp))
+                PRTextField(
+                    value = withdrawInput,
+                    onValueChange = { withdrawInput = it.filter { c -> c.isDigit() } },
+                    label = "Enter Coins",
+                    placeholder = "e.g. ${appConfig.minWithdrawalCoins}",
+                    leadingIcon = Icons.Rounded.MonetizationOn,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                )
+            }
+        }
+
+        // Live Payout Summary Card
+        item {
+            PRCard(cornerRadius = 16.dp) {
+                Text("Payout Summary", style = MaterialTheme.typography.titleMedium, color = colors.textPrimary)
+                Spacer(Modifier.height(10.dp))
+                SummaryRow("Coins to Deduct", "$enteredCoins Coins")
+                Spacer(Modifier.height(6.dp))
+                SummaryRow("Payout Value (INR)", "₹${String.format("%.2f", estimatedInr)}", highlight = colors.mintAccent)
+                Spacer(Modifier.height(6.dp))
+                SummaryRow("Processing Time", "24 – 48 Hours")
+                Spacer(Modifier.height(14.dp))
                 PrimaryGradientButton(
-                    text = "Convert to INR",
-                    isLoading = converting,
-                    enabled = convertCoins >= appConfig.minConvertCoins,
-                    onClick = {
-                        val uid = profile?.uid ?: return@PrimaryGradientButton
-                        scope.launch {
-                            converting = true
-                            val res = viewModel.repo.convertCoinsToInr(uid, convertCoins, appConfig)
-                            converting = false
-                            if (res.isSuccess) {
-                                convertInput = ""
-                                viewModel.showToast("Converted to ₹${String.format("%.2f", res.getOrThrow())} INR!", ToastType.SUCCESS)
-                            } else {
-                                viewModel.showToast(res.exceptionOrNull()?.message ?: "Conversion failed.", ToastType.ERROR)
-                            }
-                        }
-                    },
+                    text = "Withdraw ₹${String.format("%.2f", estimatedInr)}",
+                    isLoading = submitting,
+                    enabled = enteredCoins in appConfig.minWithdrawalCoins..appConfig.maxWithdrawalCoins,
+                    leadingIcon = Icons.Rounded.Send,
+                    onClick = { showConfirm = true },
                     modifier = Modifier.fillMaxWidth()
                 )
             }
         }
+    }
 
-        // Withdraw Request Card
-        item {
-            PRCard(cornerRadius = 16.dp) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("Withdraw Rewards", style = MaterialTheme.typography.titleMedium, color = colors.textPrimary)
-                    TextButton(onClick = onOpenPayoutSettings) {
-                        Text("Edit Payout Info", color = colors.primaryIndigo, fontSize = 12.5.sp, fontWeight = FontWeight.Bold)
-                    }
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-                    listOf("UPI" to Icons.Rounded.QrCode2, "BANK" to Icons.Rounded.AccountBalance).forEach { (m, ic) ->
-                        val selected = selectedMethod == m
-                        Surface(
-                            modifier = Modifier.weight(1f).bounceClick { selectedMethod = m },
-                            shape = RoundedCornerShape(14.dp),
-                            color = if (selected) colors.lavenderSoft else colors.inputBg,
-                            border = BorderStroke(if (selected) 2.dp else 1.dp, if (selected) colors.primaryIndigo else colors.cardBorder)
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(vertical = 12.dp, horizontal = 10.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.Center
-                            ) {
-                                Icon(ic, null, tint = if (selected) colors.primaryIndigo else colors.textSecondary, modifier = Modifier.size(18.dp))
-                                Spacer(Modifier.width(6.dp))
-                                Text(if (m == "UPI") "UPI Transfer" else "Bank Transfer", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = colors.textPrimary)
-                            }
-                        }
-                    }
-                }
-                Spacer(Modifier.height(12.dp))
-                PRTextField(
-                    value = withdrawCoinsInput,
-                    onValueChange = { withdrawCoinsInput = it.filter { c -> c.isDigit() } },
-                    label = "Coins to Withdraw (${appConfig.minWithdrawalCoins} - ${appConfig.maxWithdrawalCoins})",
-                    placeholder = "Enter coins",
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
-                )
-                Spacer(Modifier.height(12.dp))
+    if (showConfirm) {
+        AlertDialog(
+            onDismissRequest = { showConfirm = false },
+            containerColor = colors.card,
+            title = { Text("Confirm Withdrawal", fontWeight = FontWeight.Bold, color = colors.textPrimary) },
+            text = {
+                Text("Withdraw $enteredCoins coins (₹${String.format("%.2f", estimatedInr)}) via $selectedMethod?", color = colors.textSecondary)
+            },
+            confirmButton = {
                 PrimaryGradientButton(
-                    text = "Submit Withdrawal Request",
-                    isLoading = withdrawing,
-                    enabled = (withdrawCoinsInput.toLongOrNull() ?: 0L) >= appConfig.minWithdrawalCoins,
+                    text = "Confirm",
+                    height = 42.dp,
                     onClick = {
+                        showConfirm = false
                         val p = profile ?: return@PrimaryGradientButton
-                        val coins = withdrawCoinsInput.toLongOrNull() ?: 0L
                         scope.launch {
-                            withdrawing = true
-                            val res = viewModel.repo.requestWithdrawal(p.uid, p.fullName, coins, selectedMethod, p.payoutMethods, appConfig)
-                            withdrawing = false
+                            submitting = true
+                            val res = viewModel.repo.requestWithdrawal(p.uid, p.fullName, enteredCoins, selectedMethod, p.payoutMethods, appConfig)
+                            submitting = false
                             if (res.isSuccess) {
-                                withdrawCoinsInput = ""
-                                viewModel.showToast("Withdrawal request submitted for admin approval!", ToastType.SUCCESS)
+                                withdrawInput = ""
+                                viewModel.showToast("Withdrawal submitted for admin approval!", ToastType.SUCCESS)
+                                onBack()
                             } else {
                                 viewModel.showToast(res.exceptionOrNull()?.message ?: "Withdrawal failed.", ToastType.ERROR)
                             }
                         }
-                    },
-                    modifier = Modifier.fillMaxWidth()
+                    }
                 )
+            },
+            dismissButton = { TextButton(onClick = { showConfirm = false }) { Text("Cancel") } }
+        )
+    }
+}
+
+@Composable
+private fun PayoutOptionRow(
+    title: String,
+    subtitle: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    selected: Boolean,
+    configured: Boolean,
+    onClick: () -> Unit
+) {
+    val colors = PRTheme.colors
+    Surface(
+        modifier = Modifier.fillMaxWidth().bounceClick(onClick = onClick),
+        shape = RoundedCornerShape(14.dp),
+        color = if (selected) colors.lavenderSoft else colors.inputBg,
+        border = BorderStroke(if (selected) 1.8.dp else 1.dp, if (selected) colors.primaryIndigo else colors.cardBorder)
+    ) {
+        Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            IconBadge(icon, if (selected) colors.primaryIndigo.copy(alpha = 0.15f) else colors.card, if (selected) colors.primaryIndigo else colors.textSecondary, size = 36.dp, cornerRadius = 10.dp)
+            Spacer(Modifier.width(10.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(title, fontWeight = FontWeight.Bold, color = colors.textPrimary, fontSize = 14.sp)
+                Text(subtitle, style = MaterialTheme.typography.labelSmall, color = if (configured) colors.textSecondary else colors.amberAccent, maxLines = 1)
+            }
+            RadioButton(selected = selected, onClick = onClick)
+        }
+    }
+}
+
+@Composable
+private fun SummaryRow(label: String, value: String, highlight: Color? = null) {
+    val colors = PRTheme.colors
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+        Text(label, style = MaterialTheme.typography.bodyMedium, color = colors.textSecondary)
+        Text(value, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = highlight ?: colors.textPrimary)
+    }
+}
+
+// ============================================================================
+// SCREEN 3: DEDICATED CONVERT COINS TO INR SCREEN
+// ============================================================================
+
+@Composable
+fun ConvertCoinsScreen(
+    viewModel: MainViewModel,
+    onBack: () -> Unit
+) {
+    val colors = PRTheme.colors
+    val scope = rememberCoroutineScope()
+    val profile by viewModel.userProfile.collectAsState()
+    val appConfig by viewModel.appConfig.collectAsState()
+
+    val coinsPerInr = appConfig.coinsPerInr.coerceAtLeast(1L)
+    var input by remember { mutableStateOf("") }
+    var converting by remember { mutableStateOf(false) }
+
+    val coinsVal = input.toLongOrNull() ?: 0L
+    val inrPreview = coinsVal.toDouble() / coinsPerInr.toDouble()
+
+    Column(
+        modifier = Modifier.fillMaxSize().background(colors.canvas).statusBarsPadding().navigationBarsPadding().padding(14.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = onBack) { Icon(Icons.Rounded.ArrowBackIosNew, null, tint = colors.textPrimary, modifier = Modifier.size(20.dp)) }
+            Text("Convert Coins to INR", style = MaterialTheme.typography.titleLarge, color = colors.textPrimary)
+        }
+
+        // Balance Bar
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+            PRCard(modifier = Modifier.weight(1f), cornerRadius = 14.dp, contentPadding = PaddingValues(12.dp)) {
+                Text("Coins", style = MaterialTheme.typography.labelSmall, color = colors.textSecondary)
+                Text("${profile?.coins ?: 0}", style = MaterialTheme.typography.titleLarge, color = colors.primaryIndigo)
+            }
+            PRCard(modifier = Modifier.weight(1f), cornerRadius = 14.dp, contentPadding = PaddingValues(12.dp)) {
+                Text("INR Balance", style = MaterialTheme.typography.labelSmall, color = colors.textSecondary)
+                Text("₹${String.format("%.2f", profile?.inrBalance ?: 0.0)}", style = MaterialTheme.typography.titleLarge, color = colors.mintAccent)
             }
         }
 
-        // Transactions History
-        item {
-            Text("Transactions History", style = MaterialTheme.typography.titleLarge, color = colors.textPrimary)
-        }
-        if (transactions.isEmpty()) {
-            item {
-                EmptyStateView(
-                    icon = Icons.Rounded.ReceiptLong,
-                    title = "No Transactions Yet",
-                    subtitle = "Your task rewards, game wins, coin conversions, and withdrawals will appear here."
+        PRCard(cornerRadius = 16.dp) {
+            Text("Conversion Rate: $coinsPerInr Coins = ₹1 INR", style = MaterialTheme.typography.titleMedium, color = colors.textPrimary)
+            Text("Minimum ${appConfig.minConvertCoins} coins • No maximum limit", style = MaterialTheme.typography.labelSmall, color = colors.textSecondary)
+            Spacer(Modifier.height(12.dp))
+
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf(10000L, 25000L, 50000L).forEach { amt ->
+                    FilterChip(
+                        selected = coinsVal == amt,
+                        onClick = { input = amt.toString() },
+                        label = { Text("$amt") }
+                    )
+                }
+                FilterChip(
+                    selected = false,
+                    onClick = { input = (profile?.coins ?: 0L).toString() },
+                    label = { Text("MAX") }
                 )
             }
+            Spacer(Modifier.height(12.dp))
+            PRTextField(
+                value = input,
+                onValueChange = { input = it.filter { c -> c.isDigit() } },
+                label = "Coins to Convert",
+                placeholder = "Min ${appConfig.minConvertCoins}",
+                leadingIcon = Icons.Rounded.CurrencyExchange,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+            )
+            if (coinsVal > 0) {
+                Spacer(Modifier.height(10.dp))
+                Surface(shape = RoundedCornerShape(12.dp), color = colors.mintSoft, modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        text = "You will receive ₹${String.format("%.2f", inrPreview)} INR instantly",
+                        color = colors.mintAccent,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 13.5.sp,
+                        modifier = Modifier.padding(12.dp)
+                    )
+                }
+            }
+            Spacer(Modifier.height(14.dp))
+            PrimaryGradientButton(
+                text = "Convert Now",
+                isLoading = converting,
+                enabled = coinsVal >= appConfig.minConvertCoins,
+                onClick = {
+                    val uid = profile?.uid ?: return@PrimaryGradientButton
+                    scope.launch {
+                        converting = true
+                        val res = viewModel.repo.convertCoinsToInr(uid, coinsVal, appConfig)
+                        converting = false
+                        if (res.isSuccess) {
+                            input = ""
+                            viewModel.showToast("Converted to ₹${String.format("%.2f", res.getOrThrow())} INR!", ToastType.SUCCESS)
+                        } else {
+                            viewModel.showToast(res.exceptionOrNull()?.message ?: "Conversion failed.", ToastType.ERROR)
+                        }
+                    }
+                },
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+    }
+}
+
+// ============================================================================
+// SCREEN 4: DEDICATED TRANSACTIONS HISTORY SCREEN
+// ============================================================================
+
+@Composable
+fun WalletHistoryScreen(
+    viewModel: MainViewModel,
+    onBack: () -> Unit
+) {
+    val colors = PRTheme.colors
+    val transactions by viewModel.transactions.collectAsState()
+    var filter by remember { mutableStateOf("ALL") }
+
+    val filtered = remember(transactions, filter) {
+        when (filter) {
+            "EARNED" -> transactions.filter { it.amountCoins > 0 }
+            "WITHDRAW" -> transactions.filter { it.type == "WITHDRAWAL" }
+            "CONVERT" -> transactions.filter { it.type == "CONVERT" }
+            else -> transactions
+        }
+    }
+
+    Column(modifier = Modifier.fillMaxSize().background(colors.canvas).statusBarsPadding().navigationBarsPadding()) {
+        Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = onBack) { Icon(Icons.Rounded.ArrowBackIosNew, null, tint = colors.textPrimary, modifier = Modifier.size(20.dp)) }
+            Text("Transactions History", style = MaterialTheme.typography.titleLarge, color = colors.textPrimary)
+        }
+
+        LazyRow(
+            contentPadding = PaddingValues(horizontal = 14.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            items(listOf("ALL" to "All", "EARNED" to "Earned", "WITHDRAW" to "Withdrawals", "CONVERT" to "Conversions")) { (key, label) ->
+                FilterChip(selected = filter == key, onClick = { filter = key }, label = { Text(label) })
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+
+        if (filtered.isEmpty()) {
+            EmptyStateView(
+                icon = Icons.Rounded.ReceiptLong,
+                title = "No Transactions Found",
+                subtitle = "Your coin rewards, conversions, and withdrawals will be listed here."
+            )
         } else {
-            items(transactions, key = { it.id }) { tx ->
-                TransactionRowCard(tx)
+            LazyColumn(contentPadding = PaddingValues(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                items(filtered, key = { it.id }) { tx ->
+                    TransactionRowCard(tx)
+                }
             }
         }
     }
@@ -266,21 +577,22 @@ private fun TransactionRowCard(tx: TransactionItem) {
     val dateStr = remember(tx.createdAt) {
         if (tx.createdAt > 0) SimpleDateFormat("dd MMM, hh:mm a", Locale.getDefault()).format(Date(tx.createdAt)) else ""
     }
-    PRCard(contentPadding = PaddingValues(14.dp)) {
+    PRCard(cornerRadius = 14.dp, contentPadding = PaddingValues(12.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
             IconBadge(
                 icon = if (isPositive) Icons.Rounded.ArrowDownward else Icons.Rounded.ArrowUpward,
                 containerColor = if (isPositive) colors.mintSoft else colors.roseSoft,
                 iconTint = if (isPositive) colors.mintAccent else colors.roseAccent,
-                size = 42.dp
+                size = 38.dp,
+                cornerRadius = 11.dp
             )
-            Spacer(Modifier.width(12.dp))
+            Spacer(Modifier.width(10.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text(tx.title, style = MaterialTheme.typography.titleMedium, color = colors.textPrimary)
+                Text(tx.title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold, color = colors.textPrimary)
                 Text("$dateStr • ${tx.status}", style = MaterialTheme.typography.labelSmall, color = colors.textSecondary)
             }
             Text(
-                text = "${if (isPositive) "+" else ""}${tx.amountCoins} coins",
+                text = "${if (isPositive) "+" else ""}${tx.amountCoins}",
                 fontWeight = FontWeight.ExtraBold,
                 color = if (isPositive) colors.mintAccent else colors.roseAccent,
                 fontSize = 14.sp
@@ -288,6 +600,10 @@ private fun TransactionRowCard(tx: TransactionItem) {
         }
     }
 }
+
+// ============================================================================
+// SCREEN 5: PAYOUT METHODS SETTINGS (UPI & BANK TRANSFER)
+// ============================================================================
 
 @Composable
 fun PayoutSettingsScreen(
@@ -309,8 +625,8 @@ fun PayoutSettingsScreen(
 
     LazyColumn(
         modifier = Modifier.fillMaxSize().background(colors.canvas).statusBarsPadding().navigationBarsPadding(),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        contentPadding = PaddingValues(14.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         item {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -364,7 +680,7 @@ fun PayoutSettingsScreen(
                     leadingIcon = Icons.Rounded.Phone,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone)
                 )
-                Spacer(Modifier.height(18.dp))
+                Spacer(Modifier.height(16.dp))
                 PrimaryGradientButton(
                     text = "Save Changes",
                     isLoading = saving,

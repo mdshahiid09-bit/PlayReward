@@ -402,7 +402,29 @@ private fun PlayRewardRoot(vm: MainViewModel, onExitApp: () -> Unit) {
                             composable("wallet") {
                                 WalletScreen(
                                     viewModel = vm,
+                                    onOpenWithdraw = { navController.navigate("wallet_withdraw") },
+                                    onOpenConvert = { navController.navigate("wallet_convert") },
+                                    onOpenHistory = { navController.navigate("wallet_history") },
                                     onOpenPayoutSettings = { navController.navigate("payout_settings") }
+                                )
+                            }
+                            composable("wallet_withdraw") {
+                                WithdrawScreen(
+                                    viewModel = vm,
+                                    onBack = { navController.popBackStack() },
+                                    onOpenPayoutSettings = { navController.navigate("payout_settings") }
+                                )
+                            }
+                            composable("wallet_convert") {
+                                ConvertCoinsScreen(
+                                    viewModel = vm,
+                                    onBack = { navController.popBackStack() }
+                                )
+                            }
+                            composable("wallet_history") {
+                                WalletHistoryScreen(
+                                    viewModel = vm,
+                                    onBack = { navController.popBackStack() }
                                 )
                             }
                             composable("payout_settings") {
