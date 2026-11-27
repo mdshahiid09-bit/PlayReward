@@ -210,6 +210,7 @@ data class UserProfile(
     val referredByUid: String = "",
     val referredByCode: String = "",
     val firstWithdrawalApproved: Boolean = false,
+    val referralPromptDone: Boolean = false,
     val quizGems: Int = 0,
     val megaOfferGems: Int = 0,
     val createdAt: Long = 0L,

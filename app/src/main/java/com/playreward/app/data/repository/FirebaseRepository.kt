@@ -299,6 +299,7 @@ class FirebaseRepository {
             referredByUid = snap.child("referredByUid").getValue(String::class.java) ?: "",
             referredByCode = snap.child("referredByCode").getValue(String::class.java) ?: "",
             firstWithdrawalApproved = snap.child("firstWithdrawalApproved").getValue(Boolean::class.java) ?: false,
+            referralPromptDone = snap.child("referralPromptDone").getValue(Boolean::class.java) ?: false,
             quizGems = (snap.child("quizGems").getValue(Long::class.java) ?: 0L).toInt(),
             megaOfferGems = (snap.child("megaOfferGems").getValue(Long::class.java) ?: 0L).toInt(),
             createdAt = snap.child("createdAt").getValue(Long::class.java) ?: 0L,
@@ -494,6 +495,7 @@ class FirebaseRepository {
             "referredByUid" to referrerUid,
             "referredByCode" to referrerCode,
             "firstWithdrawalApproved" to false,
+            "referralPromptDone" to (age > 0 || referrerUid.isNotEmpty()),
             "quizGems" to 0,
             "megaOfferGems" to 0,
             "createdAt" to now
@@ -761,6 +763,69 @@ class FirebaseRepository {
                 "status" to status,
                 "createdAt" to System.currentTimeMillis()
             )
+        ).await()
+    }
+
+
+    suspend fun applyReferralCodeAfterAuth(
+        uid: String,
+        fullName: String,
+        email: String,
+        referralCodeInput: String,
+        referralConfig: ReferralConfig,
+        coinsPerInr: Long
+    ): Result<Long> = runCatching {
+        if (!referralConfig.enabled) error("Referral program is currently paused.")
+        val cleanCode = referralCodeInput.trim().uppercase(Locale.US)
+        if (cleanCode.isBlank()) error("Please enter a referral code.")
+
+        val refSnap = db.getReference("referralCodes/$cleanCode").get().await()
+        val referrerUid = refSnap.getValue(String::class.java) ?: ""
+        if (referrerUid.isBlank()) error("Invalid referral code.")
+        if (referrerUid == uid) error("You cannot use your own referral code.")
+
+        val userSnap = db.getReference("users/$uid").get().await()
+        val alreadyReferred = userSnap.child("referredByUid").getValue(String::class.java).orEmpty()
+        if (alreadyReferred.isNotBlank()) error("Referral code already applied on this account.")
+
+        val now = System.currentTimeMillis()
+        db.getReference("users/$uid").updateChildren(
+            mapOf(
+                "referredByUid" to referrerUid,
+                "referredByCode" to cleanCode,
+                "referralPromptDone" to true
+            )
+        ).await()
+
+        val rewardInr = if (coinsPerInr > 0) referralConfig.referrerRewardCoins.toDouble() / coinsPerInr else 0.0
+        db.getReference("referrals/$referrerUid/$uid").setValue(
+            mapOf(
+                "referredName" to fullName.ifBlank { "PlayReward User" },
+                "referredEmail" to email,
+                "status" to "PENDING",
+                "rewardCoins" to referralConfig.referrerRewardCoins,
+                "rewardInr" to rewardInr,
+                "createdAt" to now,
+                "completedAt" to 0L
+            )
+        ).await()
+
+        val bonus = referralConfig.signupBonusCoins
+        if (bonus > 0) {
+            adjustCoins(uid, bonus, countAsEarned = true, txType = "SIGNUP_BONUS", txTitle = "Referral Signup Bonus").getOrThrow()
+        }
+        bonus
+    }
+
+    suspend fun skipReferralPrompt(uid: String): Result<Unit> = runCatching {
+        db.getReference("users/$uid/referralPromptDone").setValue(true).await()
+    }
+
+    suspend fun savePersonalDetails(uid: String, gender: String, age: Int): Result<Unit> = runCatching {
+        require(gender.isNotBlank()) { "Please select your gender." }
+        require(age in 13..100) { "Please enter a valid age (13-100)." }
+        db.getReference("users/$uid").updateChildren(
+            mapOf("gender" to gender, "age" to age)
         ).await()
     }
 

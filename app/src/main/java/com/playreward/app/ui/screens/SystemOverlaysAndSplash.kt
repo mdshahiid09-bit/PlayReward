@@ -25,7 +25,14 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import com.playreward.app.data.model.ReferralConfig
+import com.playreward.app.data.model.UserProfile
+import com.playreward.app.ui.viewmodel.MainViewModel
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
@@ -357,6 +364,182 @@ fun ForcedUpdateScreen(
                             modifier = Modifier.fillMaxWidth()
                         )
                     }
+                }
+            }
+        }
+    }
+}
+
+
+@Composable
+fun GooglePostAuthSetupPopups(
+    profile: UserProfile,
+    referralConfig: ReferralConfig,
+    appConfig: AppConfig,
+    viewModel: MainViewModel
+) {
+    val colors = PRTheme.colors
+    val scope = rememberCoroutineScope()
+
+    val needsReferralPrompt = referralConfig.enabled && !profile.referralPromptDone && profile.referredByUid.isBlank()
+    val needsPersonalDetails = profile.gender.isBlank() || profile.age <= 0
+
+    if (!needsReferralPrompt && !needsPersonalDetails) return
+
+    var referralInput by remember { mutableStateOf("") }
+    var applyingRef by remember { mutableStateOf(false) }
+    var skippingRef by remember { mutableStateOf(false) }
+
+    var selectedGender by remember { mutableStateOf(profile.gender.ifBlank { "Male" }) }
+    var ageInput by remember { mutableStateOf(if (profile.age > 0) profile.age.toString() else "") }
+    var savingDetails by remember { mutableStateOf(false) }
+
+    Dialog(
+        onDismissRequest = {},
+        properties = DialogProperties(dismissOnBackPress = false, dismissOnClickOutside = false)
+    ) {
+        PRCard(
+            modifier = Modifier.fillMaxWidth(),
+            cornerRadius = 24.dp,
+            contentPadding = PaddingValues(22.dp)
+        ) {
+            if (needsReferralPrompt) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+                    Box(
+                        modifier = Modifier.size(64.dp).clip(RoundedCornerShape(20.dp)).background(colors.heroGradient),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Rounded.CardGiftcard, null, tint = Color.White, modifier = Modifier.size(34.dp))
+                    }
+                    Spacer(Modifier.height(14.dp))
+                    Text("Have a Referral Code?", style = MaterialTheme.typography.titleLarge, color = colors.textPrimary, textAlign = TextAlign.Center)
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        text = if (referralConfig.signupBonusCoins > 0)
+                            "Enter a friend's invite code to claim +${referralConfig.signupBonusCoins} instant signup bonus coins!"
+                        else
+                            "Enter a friend's invite code if someone invited you to PlayReward.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = colors.textSecondary,
+                        textAlign = TextAlign.Center
+                    )
+                    Spacer(Modifier.height(18.dp))
+                    PRTextField(
+                        value = referralInput,
+                        onValueChange = { referralInput = it.uppercase().trim() },
+                        label = "Referral Code",
+                        placeholder = "e.g. PR8A92C10B",
+                        leadingIcon = Icons.Rounded.ConfirmationNumber
+                    )
+                    Spacer(Modifier.height(16.dp))
+                    PrimaryGradientButton(
+                        text = "Apply Code",
+                        isLoading = applyingRef,
+                        enabled = referralInput.isNotBlank() && !skippingRef,
+                        onClick = {
+                            scope.launch {
+                                applyingRef = true
+                                val res = viewModel.repo.applyReferralCodeAfterAuth(
+                                    uid = profile.uid,
+                                    fullName = profile.fullName,
+                                    email = profile.email,
+                                    referralCodeInput = referralInput,
+                                    referralConfig = referralConfig,
+                                    coinsPerInr = appConfig.coinsPerInr
+                                )
+                                applyingRef = false
+                                if (res.isSuccess) {
+                                    val bonus = res.getOrDefault(0L)
+                                    val msg = if (bonus > 0) "Referral applied! +$bonus bonus coins credited!" else "Referral code applied!"
+                                    viewModel.showToast(msg, ToastType.SUCCESS)
+                                } else {
+                                    viewModel.showToast(res.exceptionOrNull()?.message ?: "Invalid referral code.", ToastType.ERROR)
+                                }
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    TextButton(
+                        enabled = !applyingRef && !skippingRef,
+                        onClick = {
+                            scope.launch {
+                                skippingRef = true
+                                viewModel.repo.skipReferralPrompt(profile.uid)
+                                skippingRef = false
+                            }
+                        }
+                    ) {
+                        Text(
+                            text = if (skippingRef) "Skipping..." else "Skip for now",
+                            color = colors.textSecondary,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                }
+            } else {
+                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+                    Box(
+                        modifier = Modifier.size(64.dp).clip(RoundedCornerShape(20.dp)).background(colors.heroGradient),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Rounded.Person, null, tint = Color.White, modifier = Modifier.size(34.dp))
+                    }
+                    Spacer(Modifier.height(14.dp))
+                    Text("Complete Your Profile", style = MaterialTheme.typography.titleLarge, color = colors.textPrimary, textAlign = TextAlign.Center)
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        text = "Select your gender and enter your age to finish setting up your PlayReward account.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = colors.textSecondary,
+                        textAlign = TextAlign.Center
+                    )
+                    Spacer(Modifier.height(18.dp))
+                    Text("Gender", style = MaterialTheme.typography.labelLarge, color = colors.textSecondary, modifier = Modifier.fillMaxWidth())
+                    Spacer(Modifier.height(8.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                        listOf("Male", "Female", "Other").forEach { g ->
+                            FilterChip(
+                                selected = selectedGender == g,
+                                onClick = { selectedGender = g },
+                                label = { Text(g, fontWeight = FontWeight.SemiBold) },
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                    }
+                    Spacer(Modifier.height(12.dp))
+                    PRTextField(
+                        value = ageInput,
+                        onValueChange = { ageInput = it.filter { c -> c.isDigit() }.take(3) },
+                        label = "Your Age",
+                        placeholder = "Enter age (13 - 100)",
+                        leadingIcon = Icons.Rounded.Cake,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                    )
+                    Spacer(Modifier.height(18.dp))
+                    PrimaryGradientButton(
+                        text = "Apply & Continue",
+                        isLoading = savingDetails,
+                        enabled = ageInput.isNotBlank(),
+                        onClick = {
+                            val age = ageInput.toIntOrNull() ?: 0
+                            if (age < 13 || age > 100) {
+                                viewModel.showToast("Please enter a valid age between 13 and 100.", ToastType.ERROR)
+                                return@PrimaryGradientButton
+                            }
+                            scope.launch {
+                                savingDetails = true
+                                val res = viewModel.repo.savePersonalDetails(profile.uid, selectedGender, age)
+                                savingDetails = false
+                                if (res.isSuccess) {
+                                    viewModel.showToast("Profile details saved!", ToastType.SUCCESS)
+                                } else {
+                                    viewModel.showToast(res.exceptionOrNull()?.message ?: "Could not save details.", ToastType.ERROR)
+                                }
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    )
                 }
             }
         }

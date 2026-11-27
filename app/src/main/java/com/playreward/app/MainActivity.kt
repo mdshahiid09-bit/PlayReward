@@ -65,6 +65,7 @@ private fun PlayRewardRoot(vm: MainViewModel, onExitApp: () -> Unit) {
     val currentUid by vm.currentUid.collectAsState()
     val profile by vm.userProfile.collectAsState()
     val appConfig by vm.appConfig.collectAsState()
+    val referralConfig by vm.referralConfig.collectAsState()
     val onboardingDone by vm.onboardingDone.collectAsState()
     val onboardingPages by vm.onboardingPages.collectAsState()
     val startupPopup by vm.startupPopup.collectAsState()
@@ -389,6 +390,16 @@ private fun PlayRewardRoot(vm: MainViewModel, onExitApp: () -> Unit) {
                             }
                         }
                     }
+                }
+
+                // Post-Google-Auth Referral Code & Personal Details Popups
+                profile?.let { user ->
+                    GooglePostAuthSetupPopups(
+                        profile = user,
+                        referralConfig = referralConfig,
+                        appConfig = appConfig,
+                        viewModel = vm
+                    )
                 }
 
                 // Single Full-Screen Startup Popup Image (3s close button)
