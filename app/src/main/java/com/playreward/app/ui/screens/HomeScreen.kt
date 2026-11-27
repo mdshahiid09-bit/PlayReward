@@ -2,7 +2,13 @@ package com.playreward.app.ui.screens
 
 import android.content.Intent
 import android.net.Uri
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.ui.draw.scale
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -52,6 +58,7 @@ fun HomeScreen(
     val megaConfig by viewModel.megaOfferConfig.collectAsState()
     val superConfig by viewModel.superOfferConfig.collectAsState()
     val referralConfig by viewModel.referralConfig.collectAsState()
+    val leaderboard by viewModel.leaderboard.collectAsState()
 
     val unreadCount = remember(notifications) { notifications.count { !it.read } }
     val activeTaskIds = remember(userTasks) { userTasks.map { it.taskId }.toSet() }
@@ -107,18 +114,6 @@ fun HomeScreen(
                         Box(
                             modifier = Modifier.size(10.dp).align(Alignment.TopEnd).clip(CircleShape).background(colors.roseAccent)
                         )
-                    }
-                }
-
-                // Leaderboard Icon
-                Surface(
-                    modifier = Modifier.padding(end = 6.dp).size(40.dp).bounceClick { onNavigate("leaderboard") },
-                    shape = CircleShape,
-                    color = colors.amberSoft,
-                    border = BorderStroke(1.dp, colors.amberAccent.copy(alpha = 0.35f))
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(Icons.Rounded.EmojiEvents, contentDescription = "Leaderboard", tint = colors.amberAccent, modifier = Modifier.size(20.dp))
                     }
                 }
 
@@ -429,8 +424,115 @@ fun HomeScreen(
                 }
             }
         }
+
+        // Animated Leaderboard Card below Mega Offer & Super Offer (Reference Video Style)
+        item {
+            val pulse = rememberInfiniteTransition(label = "trophyPulse")
+            val trophyScale by pulse.animateFloat(
+                initialValue = 0.94f,
+                targetValue = 1.07f,
+                animationSpec = infiniteRepeatable(tween(1100), RepeatMode.Reverse),
+                label = "trophyScale"
+            )
+            val topThree = remember(leaderboard) { leaderboard.take(3) }
+            val topScore = topThree.firstOrNull()?.totalCoinsEarned ?: 0L
+
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp)
+                    .bounceClick { onNavigate("leaderboard") },
+                shape = RoundedCornerShape(18.dp),
+                border = BorderStroke(1.2.dp, colors.amberAccent.copy(alpha = 0.65f)),
+                shadowElevation = 3.dp
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(colors.warmBannerGradient)
+                        .padding(14.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(48.dp)
+                                .scale(trophyScale)
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(colors.amberAccent),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.EmojiEvents,
+                                contentDescription = "Leaderboard",
+                                tint = Color.White,
+                                modifier = Modifier.size(26.dp)
+                            )
+                        }
+                        Spacer(Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = "Top Earners Leaderboard",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = Color(0xFFB45309)
+                                )
+                                Spacer(Modifier.width(4.dp))
+                                Icon(Icons.Rounded.AutoAwesome, null, tint = colors.amberAccent, modifier = Modifier.size(16.dp))
+                            }
+                            Spacer(Modifier.height(3.dp))
+                            Text(
+                                text = if (topScore > 0) "Top score: $topScore coins • Tap to view rankings" else "Compete daily & climb to #1 rank",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = colors.textSecondary
+                            )
+                            if (topThree.isNotEmpty()) {
+                                Spacer(Modifier.height(6.dp))
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    topThree.forEachIndexed { idx, entry ->
+                                        val badgeColors = listOf(Color(0xFFF59E0B), Color(0xFF6366F1), Color(0xFFEC4899))
+                                        Box(
+                                            modifier = Modifier
+                                                .offset(x = (-4 * idx).dp)
+                                                .size(22.dp)
+                                                .clip(CircleShape)
+                                                .background(badgeColors[idx % badgeColors.size]),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Text(
+                                                text = (entry.fullName.firstOrNull() ?: 'P').uppercase(),
+                                                color = Color.White,
+                                                fontSize = 10.sp,
+                                                fontWeight = FontWeight.ExtraBold
+                                            )
+                                        }
+                                    }
+                                    Spacer(Modifier.width(4.dp))
+                                    Text(
+                                        text = "Top earners this week",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = Color(0xFFB45309)
+                                    )
+                                }
+                            }
+                        }
+                        Icon(
+                            imageVector = Icons.Rounded.ChevronRight,
+                            contentDescription = null,
+                            tint = Color(0xFFB45309),
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
+                }
+            }
+        }
     }
 }
+
 
 @Composable
 fun FeaturedTaskRowCard(
