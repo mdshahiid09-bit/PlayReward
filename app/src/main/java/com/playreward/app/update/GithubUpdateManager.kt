@@ -132,8 +132,8 @@ class GithubUpdateManager(private val context: Context) {
     }
 
     fun isNewerVersion(remoteTag: String, currentVersion: String): Boolean {
-        val cleanRemote = Regex("[0-9]+(\.[0-9]+)*").find(remoteTag)?.value ?: return false
-        val cleanCurrent = Regex("[0-9]+(\.[0-9]+)*").find(currentVersion)?.value ?: return false
+        val cleanRemote = Regex("[0-9]+(\\.[0-9]+)*").find(remoteTag)?.value ?: return false
+        val cleanCurrent = Regex("[0-9]+(\\.[0-9]+)*").find(currentVersion)?.value ?: return false
         val r = cleanRemote.split(".").mapNotNull { it.toIntOrNull() }
         val c = cleanCurrent.split(".").mapNotNull { it.toIntOrNull() }
         val maxLen = maxOf(r.size, c.size)
