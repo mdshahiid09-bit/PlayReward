@@ -52,6 +52,9 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -63,6 +66,8 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.graphicsLayer
+import kotlinx.coroutines.delay
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.VisualTransformation
@@ -511,4 +516,84 @@ fun ShimmerSweepOverlay(modifier: Modifier = Modifier) {
                 )
             )
     )
+}
+
+@Composable
+fun AmbientAuraBackground(modifier: Modifier = Modifier) {
+    val colors = PRTheme.colors
+    val infinite = rememberInfiniteTransition(label = "auraBreath")
+    val pulse by infinite.animateFloat(
+        initialValue = 0.88f,
+        targetValue = 1.12f,
+        animationSpec = infiniteRepeatable(tween(3400, easing = LinearEasing), RepeatMode.Reverse),
+        label = "auraPulse"
+    )
+    Canvas(modifier = modifier.fillMaxWidth().height(260.dp)) {
+        val alpha1 = if (colors.isDark) 0.28f else 0.16f
+        val alpha2 = if (colors.isDark) 0.22f else 0.12f
+        drawCircle(
+            brush = Brush.radialGradient(
+                colors = listOf(colors.primaryIndigo.copy(alpha = alpha1), Color.Transparent),
+                center = Offset(size.width * 0.18f, size.height * 0.15f),
+                radius = size.width * 0.58f * pulse
+            ),
+            radius = size.width * 0.58f * pulse,
+            center = Offset(size.width * 0.18f, size.height * 0.15f)
+        )
+        drawCircle(
+            brush = Brush.radialGradient(
+                colors = listOf(colors.primaryViolet.copy(alpha = alpha2), Color.Transparent),
+                center = Offset(size.width * 0.85f, size.height * 0.25f),
+                radius = size.width * 0.52f * (2f - pulse)
+            ),
+            radius = size.width * 0.52f * (2f - pulse),
+            center = Offset(size.width * 0.85f, size.height * 0.25f)
+        )
+    }
+}
+
+@Composable
+fun StaggeredAppear(
+    index: Int,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit
+) {
+    var shown by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        delay((index * 55L).coerceAtMost(320L))
+        shown = true
+    }
+    val alpha by animateFloatAsState(
+        targetValue = if (shown) 1f else 0f,
+        animationSpec = tween(320),
+        label = "staggerAlpha"
+    )
+    val offsetY by animateFloatAsState(
+        targetValue = if (shown) 0f else 36f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessLow),
+        label = "staggerY"
+    )
+    Box(
+        modifier = modifier.graphicsLayer {
+            this.alpha = alpha
+            translationY = offsetY
+        }
+    ) {
+        content()
+    }
+}
+
+@Composable
+fun PulsingLiveDot(color: Color = Color(0xFF10B981), modifier: Modifier = Modifier) {
+    val infinite = rememberInfiniteTransition(label = "liveDot")
+    val scale by infinite.animateFloat(
+        initialValue = 0.75f,
+        targetValue = 1.45f,
+        animationSpec = infiniteRepeatable(tween(900), RepeatMode.Reverse),
+        label = "dotScale"
+    )
+    Box(modifier = modifier.size(10.dp), contentAlignment = Alignment.Center) {
+        Box(modifier = Modifier.size(10.dp).scale(scale).clip(CircleShape).background(color.copy(alpha = 0.35f)))
+        Box(modifier = Modifier.size(6.dp).clip(CircleShape).background(color))
+    }
 }

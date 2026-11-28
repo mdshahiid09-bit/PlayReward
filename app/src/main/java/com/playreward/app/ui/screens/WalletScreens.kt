@@ -87,12 +87,13 @@ fun WalletScreen(
             }
         }
 
-        // Hero Indigo-Violet Balance Card
+        // Hero Indigo-Violet Balance Card with Orbs & Shimmer Sweep
         item {
-            Box(
-                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(colors.heroGradient).padding(16.dp)
-            ) {
-                Column {
+            Surface(shape = RoundedCornerShape(22.dp), shadowElevation = 8.dp, modifier = Modifier.fillMaxWidth()) {
+                Box(modifier = Modifier.fillMaxWidth().background(colors.heroGradient)) {
+                    DecorativeOrbsOverlay()
+                    ShimmerSweepOverlay()
+                    Column(modifier = Modifier.padding(18.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
                         Box(
                             modifier = Modifier.size(42.dp).clip(RoundedCornerShape(12.dp)).background(Color.White.copy(alpha = 0.2f)),
@@ -121,6 +122,7 @@ fun WalletScreen(
                         color = Color.White.copy(alpha = 0.86f),
                         fontSize = 11.5.sp
                     )
+                    }
                 }
             }
         }
