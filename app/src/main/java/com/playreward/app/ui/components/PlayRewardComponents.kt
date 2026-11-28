@@ -114,7 +114,12 @@ fun PRCard(
         border = BorderStroke(1.dp, colors.cardBorder),
         shadowElevation = if (colors.isDark) 2.dp else 3.dp
     ) {
-        Column(modifier = Modifier.padding(contentPadding), content = content)
+        Column(
+            modifier = Modifier
+                .background(colors.cardSheenGradient)
+                .padding(contentPadding),
+            content = content
+        )
     }
 }
 
@@ -461,4 +466,49 @@ fun CelebrationBurstOverlay(visible: Boolean, modifier: Modifier = Modifier) {
             )
         }
     }
+}
+
+@Composable
+fun DecorativeOrbsOverlay(modifier: Modifier = Modifier) {
+    Canvas(modifier = modifier.fillMaxSize()) {
+        drawCircle(
+            color = Color.White.copy(alpha = 0.14f),
+            radius = size.minDimension * 0.52f,
+            center = Offset(size.width * 0.92f, size.height * 0.08f)
+        )
+        drawCircle(
+            color = Color.White.copy(alpha = 0.08f),
+            radius = size.minDimension * 0.36f,
+            center = Offset(size.width * 0.10f, size.height * 0.95f)
+        )
+    }
+}
+
+@Composable
+fun ShimmerSweepOverlay(modifier: Modifier = Modifier) {
+    val transition = rememberInfiniteTransition(label = "cardSheen")
+    val xOffset by transition.animateFloat(
+        initialValue = -400f,
+        targetValue = 1200f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 2800, delayMillis = 1200, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "sheenX"
+    )
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .background(
+                Brush.linearGradient(
+                    colors = listOf(
+                        Color.Transparent,
+                        Color.White.copy(alpha = 0.14f),
+                        Color.Transparent
+                    ),
+                    start = Offset(xOffset, 0f),
+                    end = Offset(xOffset + 220f, 220f)
+                )
+            )
+    )
 }

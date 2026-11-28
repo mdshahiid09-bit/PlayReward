@@ -262,15 +262,19 @@ private fun PlayRewardRoot(vm: MainViewModel, onExitApp: () -> Unit) {
                         bottomBar = {
                             if (currentRoute in topLevelRoutes) {
                                 Surface(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .navigationBarsPadding()
+                                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                                    shape = RoundedCornerShape(24.dp),
                                     color = colors.card,
                                     border = BorderStroke(1.dp, colors.cardBorder),
-                                    shadowElevation = 8.dp
+                                    shadowElevation = 10.dp
                                 ) {
                                     Row(
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .navigationBarsPadding()
-                                            .padding(horizontal = 4.dp, vertical = 6.dp),
+                                            .padding(horizontal = 6.dp, vertical = 7.dp),
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         bottomTabs.forEach { tab ->
@@ -279,15 +283,16 @@ private fun PlayRewardRoot(vm: MainViewModel, onExitApp: () -> Unit) {
                                             Column(
                                                 modifier = Modifier
                                                     .weight(1f)
-                                                    .clip(RoundedCornerShape(12.dp))
+                                                    .clip(RoundedCornerShape(16.dp))
+                                                    .background(if (selected && !isHome) colors.lavenderSoft else Color.Transparent)
                                                     .clickable { vm.soundFx.playClick(); navigateToRoute(tab.route) }
-                                                    .padding(vertical = 4.dp),
+                                                    .padding(vertical = 5.dp),
                                                 horizontalAlignment = Alignment.CenterHorizontally
                                             ) {
                                                 if (isHome) {
                                                     Box(
                                                         modifier = Modifier
-                                                            .size(34.dp)
+                                                            .size(38.dp)
                                                             .clip(CircleShape)
                                                             .background(
                                                                 if (selected) colors.heroGradient
@@ -302,15 +307,15 @@ private fun PlayRewardRoot(vm: MainViewModel, onExitApp: () -> Unit) {
                                                         tab.icon,
                                                         tab.label,
                                                         tint = if (selected) colors.primaryIndigo else colors.textSecondary,
-                                                        modifier = Modifier.size(22.dp)
+                                                        modifier = Modifier.size(20.dp)
                                                     )
                                                 }
                                                 Spacer(Modifier.height(2.dp))
                                                 Text(
                                                     text = tab.label,
-                                                    fontSize = 10.sp,
+                                                    fontSize = 9.5.sp,
                                                     maxLines = 1,
-                                                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                                                    fontWeight = if (selected) FontWeight.ExtraBold else FontWeight.Medium,
                                                     color = if (selected) colors.primaryIndigo else colors.textSecondary
                                                 )
                                             }
