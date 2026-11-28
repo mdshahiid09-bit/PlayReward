@@ -461,7 +461,18 @@ private fun PlayRewardRoot(vm: MainViewModel, onExitApp: () -> Unit) {
                                 EditProfileScreen(viewModel = vm, onBack = { navController.popBackStack() })
                             }
                             composable("settings") {
-                                SettingsScreen(viewModel = vm, onBack = { navController.popBackStack() })
+                                SettingsScreen(
+                                    viewModel = vm,
+                                    onBack = { navController.popBackStack() },
+                                    onOpenChangePassword = { navController.navigate("change_password") },
+                                    onOpenDeleteAccount = { navController.navigate("delete_account") }
+                                )
+                            }
+                            composable("change_password") {
+                                ChangePasswordScreen(viewModel = vm, onBack = { navController.popBackStack() })
+                            }
+                            composable("delete_account") {
+                                DeleteAccountScreen(viewModel = vm, onBack = { navController.popBackStack() })
                             }
                             composable("legal/{type}", arguments = listOf(navArgument("type") { type = NavType.StringType })) {
                                 LegalPageScreen(

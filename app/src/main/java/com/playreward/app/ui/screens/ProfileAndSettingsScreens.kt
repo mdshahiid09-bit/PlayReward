@@ -303,62 +303,66 @@ fun EditProfileScreen(viewModel: MainViewModel, onBack: () -> Unit) {
 }
 
 @Composable
-fun SettingsScreen(viewModel: MainViewModel, onBack: () -> Unit) {
+fun SettingsScreen(
+    viewModel: MainViewModel,
+    onBack: () -> Unit,
+    onOpenChangePassword: () -> Unit,
+    onOpenDeleteAccount: () -> Unit
+) {
     val colors = PRTheme.colors
-    val scope = rememberCoroutineScope()
     val themeMode by viewModel.themeMode.collectAsState()
     val soundEnabled by viewModel.soundEnabled.collectAsState()
     val hapticsEnabled by viewModel.hapticsEnabled.collectAsState()
     val bgServiceEnabled by viewModel.bgServiceEnabled.collectAsState()
     val profile by viewModel.userProfile.collectAsState()
 
-    var oldPass by remember { mutableStateOf("") }
-    var newPass by remember { mutableStateOf("") }
-    var confirmPass by remember { mutableStateOf("") }
-    var changingPass by remember { mutableStateOf(false) }
-
-    var deletePass by remember { mutableStateOf("") }
-    var deleteReason by remember { mutableStateOf("") }
-    var showDeleteConfirm by remember { mutableStateOf(false) }
-    var deleting by remember { mutableStateOf(false) }
-
     val deleteReq = profile?.deleteRequest
-    val daysToPermanentDelete = if (deleteReq?.requested == true && deleteReq.scheduledDeleteAt > System.currentTimeMillis()) {
+    val daysToDelete = if (deleteReq?.requested == true && deleteReq.scheduledDeleteAt > System.currentTimeMillis()) {
         ceil((deleteReq.scheduledDeleteAt - System.currentTimeMillis()).toDouble() / TimeUnit.DAYS.toMillis(1).toDouble()).toInt().coerceAtLeast(1)
     } else 0
 
     LazyColumn(
         modifier = Modifier.fillMaxSize().background(colors.canvas).statusBarsPadding().navigationBarsPadding(),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        contentPadding = PaddingValues(14.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         item {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = onBack) { Icon(Icons.Rounded.ArrowBackIosNew, null, tint = colors.textPrimary, modifier = Modifier.size(20.dp)) }
+                IconButton(onClick = onBack, modifier = Modifier.size(36.dp)) {
+                    Icon(Icons.Rounded.ArrowBackIosNew, null, tint = colors.textPrimary, modifier = Modifier.size(18.dp))
+                }
+                Spacer(Modifier.width(6.dp))
                 Text("Settings", style = MaterialTheme.typography.titleLarge, color = colors.textPrimary)
             }
         }
 
-        // Theme Mode (Light / Dark / System)
+        // Appearance & Theme
         item {
             PRCard(cornerRadius = 16.dp) {
                 Text("Appearance & Theme", style = MaterialTheme.typography.titleMedium, color = colors.textPrimary)
                 Spacer(Modifier.height(10.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                     listOf(ThemeMode.LIGHT to "Light", ThemeMode.DARK to "Dark", ThemeMode.SYSTEM to "System").forEach { (m, label) ->
-                        FilterChip(
-                            selected = themeMode == m,
-                            onClick = { viewModel.setTheme(m) },
-                            label = { Text(label) },
-                            modifier = Modifier.weight(1f)
-                        )
+                        val active = themeMode == m
+                        Surface(
+                            modifier = Modifier.weight(1f).bounceClick {
+                                viewModel.soundFx.playClick()
+                                viewModel.setTheme(m)
+                            },
+                            shape = RoundedCornerShape(10.dp),
+                            color = if (active) colors.primaryIndigo else colors.inputBg,
+                            border = BorderStroke(1.dp, if (active) colors.primaryIndigo else colors.cardBorder)
+                        ) {
+                            Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(vertical = 9.dp)) {
+                                Text(label, color = if (active) Color.White else colors.textPrimary, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, maxLines = 1)
+                            }
+                        }
                     }
                 }
             }
         }
 
-
-        // Sound, Haptics & Background Service Toggles
+        // Sound, Haptics & Background Service
         item {
             PRCard(cornerRadius = 16.dp) {
                 Text("Sound, Effects & Background", style = MaterialTheme.typography.titleMedium, color = colors.textPrimary)
@@ -385,38 +389,153 @@ fun SettingsScreen(viewModel: MainViewModel, onBack: () -> Unit) {
                 Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text("Keep Active in Background", style = MaterialTheme.typography.bodyLarge, color = colors.textPrimary)
-                        Text("Foreground service prevents app reload on minimize", style = MaterialTheme.typography.labelSmall, color = colors.textSecondary)
+                        Text("Foreground service keeps timers & downloads alive", style = MaterialTheme.typography.labelSmall, color = colors.textSecondary)
                     }
                     Switch(checked = bgServiceEnabled, onCheckedChange = { viewModel.setBgServiceEnabled(it) })
                 }
             }
         }
 
-        // Change Password
+        // Account & Security — Links to Dedicated Screens
+        item {
+            PRCard(cornerRadius = 16.dp, contentPadding = PaddingValues(vertical = 6.dp)) {
+                Text(
+                    text = "Account & Security",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = colors.textPrimary,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                )
+                ProfileMenuRow(Icons.Rounded.LockReset, "Change Password", colors.lavenderSoft, colors.primaryIndigo) {
+                    viewModel.soundFx.playClick()
+                    onOpenChangePassword()
+                }
+                HorizontalDivider(color = colors.cardBorder, modifier = Modifier.padding(horizontal = 16.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth().clickable {
+                        viewModel.soundFx.playClick()
+                        onOpenDeleteAccount()
+                    }.padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconBadge(Icons.Rounded.DeleteForever, colors.roseSoft, colors.roseAccent, size = 38.dp, cornerRadius = 12.dp)
+                    Spacer(Modifier.width(14.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Delete Account", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium, color = colors.roseAccent)
+                        Text(
+                            text = if (deleteReq?.requested == true) "Scheduled — $daysToDelete days left to recover" else "Permanent removal with 7-day grace period",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = colors.textSecondary
+                        )
+                    }
+                    Icon(Icons.Rounded.ChevronRight, null, tint = colors.roseAccent, modifier = Modifier.size(20.dp))
+                }
+            }
+        }
+    }
+}
+
+// ============================================================================
+// DEDICATED CHANGE PASSWORD SCREEN
+// ============================================================================
+
+@Composable
+fun ChangePasswordScreen(
+    viewModel: MainViewModel,
+    onBack: () -> Unit
+) {
+    val colors = PRTheme.colors
+    val scope = rememberCoroutineScope()
+
+    var oldPass by remember { mutableStateOf("") }
+    var newPass by remember { mutableStateOf("") }
+    var confirmPass by remember { mutableStateOf("") }
+    var showOld by remember { mutableStateOf(false) }
+    var showNew by remember { mutableStateOf(false) }
+    var saving by remember { mutableStateOf(false) }
+
+    val passwordsMatch = newPass.isNotEmpty() && newPass == confirmPass
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize().background(colors.canvas).statusBarsPadding().navigationBarsPadding(),
+        contentPadding = PaddingValues(14.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        item {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = onBack, modifier = Modifier.size(36.dp)) {
+                    Icon(Icons.Rounded.ArrowBackIosNew, null, tint = colors.textPrimary, modifier = Modifier.size(18.dp))
+                }
+                Spacer(Modifier.width(6.dp))
+                Text("Change Password", style = MaterialTheme.typography.titleLarge, color = colors.textPrimary)
+            }
+        }
+
         item {
             PRCard(cornerRadius = 16.dp) {
-                Text("Change Password", style = MaterialTheme.typography.titleMedium, color = colors.textPrimary)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconBadge(Icons.Rounded.Security, colors.lavenderSoft, colors.primaryIndigo, size = 44.dp, cornerRadius = 13.dp)
+                    Spacer(Modifier.width(12.dp))
+                    Column {
+                        Text("Update Account Password", style = MaterialTheme.typography.titleMedium, color = colors.textPrimary)
+                        Text("Use at least 6 characters for strong security.", style = MaterialTheme.typography.labelSmall, color = colors.textSecondary)
+                    }
+                }
+                Spacer(Modifier.height(16.dp))
+                PRTextField(
+                    value = oldPass,
+                    onValueChange = { oldPass = it },
+                    label = "Old Password",
+                    leadingIcon = Icons.Rounded.Lock,
+                    visualTransformation = if (showOld) VisualTransformation.None else PasswordVisualTransformation(),
+                    trailingIcon = {
+                        IconButton(onClick = { showOld = !showOld }) {
+                            Icon(if (showOld) Icons.Rounded.VisibilityOff else Icons.Rounded.Visibility, null, tint = colors.textSecondary)
+                        }
+                    }
+                )
                 Spacer(Modifier.height(12.dp))
-                PRTextField(value = oldPass, onValueChange = { oldPass = it }, label = "Current Password", visualTransformation = PasswordVisualTransformation(), leadingIcon = Icons.Rounded.Lock)
-                Spacer(Modifier.height(10.dp))
-                PRTextField(value = newPass, onValueChange = { newPass = it }, label = "New Password", visualTransformation = PasswordVisualTransformation(), leadingIcon = Icons.Rounded.LockReset)
-                Spacer(Modifier.height(10.dp))
-                PRTextField(value = confirmPass, onValueChange = { confirmPass = it }, label = "Confirm New Password", visualTransformation = PasswordVisualTransformation(), leadingIcon = Icons.Rounded.LockReset)
-                Spacer(Modifier.height(14.dp))
+                PRTextField(
+                    value = newPass,
+                    onValueChange = { newPass = it },
+                    label = "New Password",
+                    leadingIcon = Icons.Rounded.LockReset,
+                    visualTransformation = if (showNew) VisualTransformation.None else PasswordVisualTransformation(),
+                    trailingIcon = {
+                        IconButton(onClick = { showNew = !showNew }) {
+                            Icon(if (showNew) Icons.Rounded.VisibilityOff else Icons.Rounded.Visibility, null, tint = colors.textSecondary)
+                        }
+                    }
+                )
+                Spacer(Modifier.height(12.dp))
+                PRTextField(
+                    value = confirmPass,
+                    onValueChange = { confirmPass = it },
+                    label = "Confirm New Password",
+                    leadingIcon = Icons.Rounded.VerifiedUser,
+                    isError = confirmPass.isNotEmpty() && !passwordsMatch,
+                    visualTransformation = if (showNew) VisualTransformation.None else PasswordVisualTransformation()
+                )
+                if (confirmPass.isNotEmpty() && !passwordsMatch) {
+                    Spacer(Modifier.height(4.dp))
+                    Text("Passwords do not match", color = colors.roseAccent, fontSize = 12.sp)
+                }
+                Spacer(Modifier.height(18.dp))
                 PrimaryGradientButton(
-                    text = "Save Password",
-                    isLoading = changingPass,
-                    enabled = oldPass.isNotBlank() && newPass.length >= 6 && newPass == confirmPass,
+                    text = "Save Changes",
+                    isLoading = saving,
+                    enabled = oldPass.isNotBlank() && newPass.length >= 6 && passwordsMatch,
+                    leadingIcon = Icons.Rounded.CheckCircle,
                     onClick = {
                         scope.launch {
-                            changingPass = true
+                            saving = true
                             val res = viewModel.repo.changePassword(oldPass, newPass)
-                            changingPass = false
+                            saving = false
                             if (res.isSuccess) {
                                 oldPass = ""; newPass = ""; confirmPass = ""
-                                viewModel.showToast("Password updated successfully!", ToastType.SUCCESS)
+                                viewModel.showToast("Password changed successfully!", ToastType.SUCCESS)
+                                onBack()
                             } else {
-                                viewModel.showToast(res.exceptionOrNull()?.message ?: "Password update failed.", ToastType.ERROR)
+                                viewModel.showToast(res.exceptionOrNull()?.message ?: "Could not update password.", ToastType.ERROR)
                             }
                         }
                     },
@@ -424,93 +543,169 @@ fun SettingsScreen(viewModel: MainViewModel, onBack: () -> Unit) {
                 )
             }
         }
+    }
+}
 
-        // Delete Account (7-Day Grace Period)
+// ============================================================================
+// DEDICATED DELETE ACCOUNT SCREEN (7-DAY GRACE & RECOVERY PERIOD)
+// ============================================================================
+
+@Composable
+fun DeleteAccountScreen(
+    viewModel: MainViewModel,
+    onBack: () -> Unit
+) {
+    val colors = PRTheme.colors
+    val scope = rememberCoroutineScope()
+    val profile by viewModel.userProfile.collectAsState()
+
+    var deletePass by remember { mutableStateOf("") }
+    var deleteReason by remember { mutableStateOf("") }
+    var showPass by remember { mutableStateOf(false) }
+    var showConfirmDialog by remember { mutableStateOf(false) }
+    var processing by remember { mutableStateOf(false) }
+
+    val deleteReq = profile?.deleteRequest
+    val daysLeft = if (deleteReq?.requested == true && deleteReq.scheduledDeleteAt > System.currentTimeMillis()) {
+        ceil((deleteReq.scheduledDeleteAt - System.currentTimeMillis()).toDouble() / TimeUnit.DAYS.toMillis(1).toDouble()).toInt().coerceAtLeast(1)
+    } else 0
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize().background(colors.canvas).statusBarsPadding().navigationBarsPadding(),
+        contentPadding = PaddingValues(14.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        item {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = onBack, modifier = Modifier.size(36.dp)) {
+                    Icon(Icons.Rounded.ArrowBackIosNew, null, tint = colors.textPrimary, modifier = Modifier.size(18.dp))
+                }
+                Spacer(Modifier.width(6.dp))
+                Text("Delete Account", style = MaterialTheme.typography.titleLarge, color = colors.roseAccent)
+            }
+        }
+
+        // Detailed Information Card
+        item {
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                color = colors.roseSoft,
+                border = BorderStroke(1.dp, colors.roseBorder)
+            ) {
+                Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Rounded.WarningAmber, null, tint = colors.roseAccent, modifier = Modifier.size(20.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Important Deletion Policy", fontWeight = FontWeight.Bold, color = colors.roseAccent, fontSize = 14.5.sp)
+                    }
+                    Text("• Your account enters a 7-day recovery window after confirmation.", style = MaterialTheme.typography.bodyMedium, color = colors.textPrimary)
+                    Text("• After 7 days, your profile, coins, INR balance, task history, and referral records will be permanently deleted.", style = MaterialTheme.typography.bodyMedium, color = colors.textPrimary)
+                    Text("• You can cancel deletion anytime within those 7 days to restore full access.", style = MaterialTheme.typography.bodyMedium, color = colors.textPrimary)
+                }
+            }
+        }
+
         item {
             PRCard(cornerRadius = 16.dp) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconBadge(Icons.Rounded.DeleteForever, colors.roseSoft, colors.roseAccent, size = 40.dp)
-                    Spacer(Modifier.width(10.dp))
-                    Column {
-                        Text("Delete Account", style = MaterialTheme.typography.titleMedium, color = colors.roseAccent)
-                        Text("7-day recovery window before permanent removal", style = MaterialTheme.typography.labelSmall, color = colors.textSecondary)
-                    }
-                }
-                Spacer(Modifier.height(12.dp))
-
                 if (deleteReq?.requested == true) {
-                    Surface(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(14.dp),
-                        color = colors.roseSoft,
-                        border = BorderStroke(1.dp, colors.roseBorder)
-                    ) {
-                        Column(modifier = Modifier.padding(11.dp)) {
-                            Text("Account Scheduled for Deletion", fontWeight = FontWeight.Bold, color = colors.roseAccent)
-                            Spacer(Modifier.height(4.dp))
-                            Text("$daysToPermanentDelete days left to recover your account before all data is permanently deleted.", style = MaterialTheme.typography.bodyMedium, color = colors.textPrimary)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        IconBadge(Icons.Rounded.Schedule, colors.roseSoft, colors.roseAccent, size = 44.dp, cornerRadius = 13.dp)
+                        Spacer(Modifier.width(12.dp))
+                        Column {
+                            Text("Deletion Scheduled", style = MaterialTheme.typography.titleMedium, color = colors.roseAccent)
+                            Text("$daysLeft ${if (daysLeft == 1) "day" else "days"} left to recover your account", style = MaterialTheme.typography.bodyMedium, color = colors.textSecondary)
                         }
                     }
-                    Spacer(Modifier.height(12.dp))
-                    SecondaryOutlineButton(
+                    Spacer(Modifier.height(16.dp))
+                    PrimaryGradientButton(
                         text = "Cancel Deletion & Recover Account",
+                        isLoading = processing,
+                        leadingIcon = Icons.Rounded.Restore,
                         onClick = {
-                            val uid = profile?.uid ?: return@SecondaryOutlineButton
+                            val uid = profile?.uid ?: return@PrimaryGradientButton
                             scope.launch {
-                                viewModel.repo.cancelAccountDeletion(uid)
-                                viewModel.showToast("Account deletion cancelled!", ToastType.SUCCESS)
+                                processing = true
+                                val res = viewModel.repo.cancelAccountDeletion(uid)
+                                processing = false
+                                if (res.isSuccess) {
+                                    viewModel.showToast("Account recovered! Deletion cancelled.", ToastType.SUCCESS)
+                                } else {
+                                    viewModel.showToast(res.exceptionOrNull()?.message ?: "Could not cancel deletion.", ToastType.ERROR)
+                                }
                             }
                         },
                         modifier = Modifier.fillMaxWidth()
                     )
                 } else {
-                    Text(
-                        text = "Requesting permanent deletion schedules your profile, coins, and history for removal after 7 days. You can cancel anytime within those 7 days.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = colors.textSecondary
+                    Text("Confirm Your Identity", style = MaterialTheme.typography.titleMedium, color = colors.textPrimary)
+                    Spacer(Modifier.height(12.dp))
+                    PRTextField(
+                        value = deleteReason,
+                        onValueChange = { deleteReason = it },
+                        label = "Reason for Leaving (Optional)",
+                        placeholder = "Help us improve PlayReward",
+                        singleLine = false,
+                        minLines = 2
                     )
                     Spacer(Modifier.height(12.dp))
-                    PRTextField(value = deleteReason, onValueChange = { deleteReason = it }, label = "Reason (Optional)")
-                    Spacer(Modifier.height(10.dp))
-                    PRTextField(value = deletePass, onValueChange = { deletePass = it }, label = "Enter Password to Confirm", visualTransformation = PasswordVisualTransformation(), leadingIcon = Icons.Rounded.Lock)
-                    Spacer(Modifier.height(14.dp))
+                    PRTextField(
+                        value = deletePass,
+                        onValueChange = { deletePass = it },
+                        label = "Account Password (Required for Email Login)",
+                        leadingIcon = Icons.Rounded.Lock,
+                        visualTransformation = if (showPass) VisualTransformation.None else PasswordVisualTransformation(),
+                        trailingIcon = {
+                            IconButton(onClick = { showPass = !showPass }) {
+                                Icon(if (showPass) Icons.Rounded.VisibilityOff else Icons.Rounded.Visibility, null, tint = colors.textSecondary)
+                            }
+                        }
+                    )
+                    Spacer(Modifier.height(18.dp))
                     Button(
-                        onClick = { showDeleteConfirm = true },
-                        enabled = !deleting,
+                        onClick = { showConfirmDialog = true },
+                        enabled = !processing,
                         colors = ButtonDefaults.buttonColors(containerColor = colors.roseAccent),
                         shape = RoundedCornerShape(14.dp),
-                        modifier = Modifier.fillMaxWidth().height(50.dp)
+                        modifier = Modifier.fillMaxWidth().height(48.dp)
                     ) {
-                        Text("Request Permanent Deletion", fontWeight = FontWeight.Bold, color = Color.White)
+                        if (processing) {
+                            CircularProgressIndicator(Modifier.size(20.dp), color = Color.White, strokeWidth = 2.2.dp)
+                        } else {
+                            Icon(Icons.Rounded.DeleteForever, null, tint = Color.White, modifier = Modifier.size(19.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text("Request Permanent Deletion", fontWeight = FontWeight.Bold, color = Color.White)
+                        }
                     }
                 }
             }
         }
     }
 
-    if (showDeleteConfirm) {
+    if (showConfirmDialog) {
         AlertDialog(
-            onDismissRequest = { showDeleteConfirm = false },
+            onDismissRequest = { showConfirmDialog = false },
             containerColor = colors.card,
-            title = { Text("Confirm Account Deletion", color = colors.roseAccent, fontWeight = FontWeight.Bold) },
-            text = { Text("Your account will be scheduled for permanent deletion in 7 days. You can recover it within 7 days.", color = colors.textSecondary) },
+            icon = { Icon(Icons.Rounded.DeleteForever, null, tint = colors.roseAccent) },
+            title = { Text("Schedule Account Deletion?", color = colors.roseAccent, fontWeight = FontWeight.Bold) },
+            text = { Text("Your account will be permanently deleted in 7 days unless you cancel it before then.", color = colors.textSecondary) },
             confirmButton = {
                 TextButton(onClick = {
-                    showDeleteConfirm = false
+                    showConfirmDialog = false
                     scope.launch {
-                        deleting = true
+                        processing = true
                         val res = viewModel.repo.requestAccountDeletion(deletePass, deleteReason)
-                        deleting = false
+                        processing = false
                         if (res.isSuccess) {
                             deletePass = ""
-                            viewModel.showToast("Account scheduled for deletion (7 days left to recover).", ToastType.INFO)
+                            viewModel.showToast("Deletion scheduled (7 days left to recover).", ToastType.INFO)
                         } else {
-                            viewModel.showToast(res.exceptionOrNull()?.message ?: "Re-authentication failed.", ToastType.ERROR)
+                            viewModel.showToast(res.exceptionOrNull()?.message ?: "Authentication failed.", ToastType.ERROR)
                         }
                     }
                 }) { Text("Confirm Delete", color = colors.roseAccent, fontWeight = FontWeight.Bold) }
             },
-            dismissButton = { TextButton(onClick = { showDeleteConfirm = false }) { Text("Cancel") } }
+            dismissButton = { TextButton(onClick = { showConfirmDialog = false }) { Text("Cancel") } }
         )
     }
 }
