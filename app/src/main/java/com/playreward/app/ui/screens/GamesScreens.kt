@@ -15,6 +15,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -36,6 +37,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
@@ -285,16 +287,30 @@ fun MegaOfferScreen(
 }
 
 // ============================================================================
-// SUPER OFFER — SCREEN 1: DEDICATED ARENA LOBBY
+// SUPER OFFER — SCREEN 1: COMPACT ARENA LOBBY + FREE PRACTICE (0 -> +1 COIN)
 // ============================================================================
 
+private val FREE_PRACTICE_TIER = TicTacToeTier(
+    id = "free_practice",
+    difficulty = "FREE",
+    entryCoins = 0L,
+    winCoins = 1L,
+    label = "Free Practice"
+)
+
 private fun defaultTicTacToeTiers(): List<TicTacToeTier> = listOf(
+    FREE_PRACTICE_TIER,
     TicTacToeTier("low_10", "LOW", 10, 12, "Starter"),
     TicTacToeTier("med_10", "MEDIUM", 10, 15, "Pro"),
     TicTacToeTier("high_10", "HIGH", 10, 18, "Master"),
     TicTacToeTier("high_100", "HIGH", 100, 180, "Champion"),
     TicTacToeTier("high_500", "HIGH", 500, 950, "Legend")
 )
+
+private fun buildArenaTiers(adminTiers: List<TicTacToeTier>): List<TicTacToeTier> {
+    val base = if (adminTiers.isNotEmpty()) adminTiers else defaultTicTacToeTiers()
+    return if (base.any { it.entryCoins == 0L }) base else listOf(FREE_PRACTICE_TIER) + base
+}
 
 @Composable
 fun SuperOfferTicTacToeScreen(
@@ -307,9 +323,7 @@ fun SuperOfferTicTacToeScreen(
     val profile by viewModel.userProfile.collectAsState()
     val config by viewModel.superOfferConfig.collectAsState()
 
-    val allTiers = remember(config.tiers) {
-        if (config.tiers.isNotEmpty()) config.tiers else defaultTicTacToeTiers()
-    }
+    val allTiers = remember(config.tiers) { buildArenaTiers(config.tiers) }
     var selectedFilter by remember { mutableStateOf("ALL") }
     var pendingTier by remember { mutableStateOf<TicTacToeTier?>(null) }
     var starting by remember { mutableStateOf(false) }
@@ -320,34 +334,35 @@ fun SuperOfferTicTacToeScreen(
 
     LazyColumn(
         modifier = Modifier.fillMaxSize().background(colors.canvas).statusBarsPadding().navigationBarsPadding(),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        contentPadding = PaddingValues(14.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        // Top App Bar
+        // Compact Top Bar
         item {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                IconButton(onClick = onBack) {
-                    Icon(Icons.Rounded.ArrowBackIosNew, null, tint = colors.textPrimary, modifier = Modifier.size(20.dp))
+                IconButton(onClick = onBack, modifier = Modifier.size(36.dp)) {
+                    Icon(Icons.Rounded.ArrowBackIosNew, null, tint = colors.textPrimary, modifier = Modifier.size(18.dp))
                 }
+                Spacer(Modifier.width(6.dp))
                 Text("Super Offer", style = MaterialTheme.typography.titleLarge, color = colors.textPrimary, modifier = Modifier.weight(1f))
-                Surface(shape = CircleShape, color = colors.amberSoft, border = BorderStroke(1.dp, colors.amberAccent.copy(alpha = 0.3f))) {
-                    Row(modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Image(painterResource(R.drawable.ic_coin), null, modifier = Modifier.size(16.dp))
-                        Spacer(Modifier.width(6.dp))
-                        Text("${profile?.coins ?: 0}", color = Color(0xFFB45309), fontWeight = FontWeight.ExtraBold)
+                Surface(shape = CircleShape, color = colors.amberSoft, border = BorderStroke(1.dp, colors.amberAccent.copy(alpha = 0.35f))) {
+                    Row(modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Image(painterResource(R.drawable.ic_coin), null, modifier = Modifier.size(15.dp))
+                        Spacer(Modifier.width(5.dp))
+                        Text("${profile?.coins ?: 0}", color = Color(0xFFB45309), fontWeight = FontWeight.ExtraBold, fontSize = 13.sp)
                     }
                 }
             }
         }
 
-        // Game-Vibe Hero Arena Banner
+        // Sleek Compact Hero Banner (No Oversized Height!)
         item {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(24.dp))
+                    .clip(RoundedCornerShape(18.dp))
                     .background(colors.superGradient)
-                    .padding(20.dp)
+                    .padding(14.dp)
             ) {
                 Column {
                     Row(
@@ -356,29 +371,37 @@ fun SuperOfferTicTacToeScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Surface(shape = CircleShape, color = Color.White.copy(alpha = 0.22f)) {
-                            Row(modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Rounded.SportsEsports, null, tint = Color.White, modifier = Modifier.size(14.dp))
-                                Spacer(Modifier.width(5.dp))
-                                Text("1v1 AI ARENA", color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 11.sp)
+                            Row(modifier = Modifier.padding(horizontal = 9.dp, vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Rounded.SportsEsports, null, tint = Color.White, modifier = Modifier.size(13.dp))
+                                Spacer(Modifier.width(4.dp))
+                                Text("1v1 AI ARENA", color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 10.sp)
                             }
                         }
                         Box(
-                            modifier = Modifier.size(44.dp).clip(RoundedCornerShape(14.dp)).background(Color.White.copy(alpha = 0.2f)),
+                            modifier = Modifier.size(34.dp).clip(RoundedCornerShape(10.dp)).background(Color.White.copy(alpha = 0.2f)),
                             contentAlignment = Alignment.Center
                         ) {
-                            Icon(Icons.Rounded.Grid3x3, null, tint = Color.White, modifier = Modifier.size(26.dp))
+                            Icon(Icons.Rounded.Grid3x3, null, tint = Color.White, modifier = Modifier.size(20.dp))
                         }
                     }
-                    Spacer(Modifier.height(14.dp))
-                    Text(config.title, color = Color.White, style = MaterialTheme.typography.headlineMedium)
-                    Spacer(Modifier.height(6.dp))
+                    Spacer(Modifier.height(8.dp))
                     Text(
-                        text = "Choose your battle table below. Defeat the AI in a full-screen 1v1 match to multiply your coins instantly!",
-                        color = Color.White.copy(alpha = 0.9f),
-                        style = MaterialTheme.typography.bodyMedium
+                        text = config.title,
+                        color = Color.White,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.ExtraBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
-                    Spacer(Modifier.height(14.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Spacer(Modifier.height(3.dp))
+                    Text(
+                        text = "Practice free (+1 coin) or stake coins to multiply your rewards!",
+                        color = Color.White.copy(alpha = 0.9f),
+                        fontSize = 12.sp,
+                        lineHeight = 16.sp
+                    )
+                    Spacer(Modifier.height(10.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         ArenaRuleChip("Win = Instant Coins")
                         ArenaRuleChip("Draw = Full Refund")
                     }
@@ -386,98 +409,139 @@ fun SuperOfferTicTacToeScreen(
             }
         }
 
-        // Difficulty Filter Chips
+        // Single-Line Scrollable Difficulty Pills (Zero Text Wrapping!)
         item {
             Column {
-                Text("Choose Difficulty", style = MaterialTheme.typography.titleMedium, color = colors.textPrimary)
-                Spacer(Modifier.height(10.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                    listOf("ALL" to "All", "LOW" to "Low", "MEDIUM" to "Medium", "HIGH" to "High").forEach { (key, label) ->
-                        FilterChip(
-                            selected = selectedFilter == key,
-                            onClick = { selectedFilter = key },
-                            label = { Text(label, fontWeight = FontWeight.SemiBold) },
-                            modifier = Modifier.weight(1f)
-                        )
+                Text("Choose Difficulty", style = MaterialTheme.typography.titleMedium, color = colors.textPrimary, fontSize = 15.sp)
+                Spacer(Modifier.height(8.dp))
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(listOf("ALL" to "All", "FREE" to "Free", "LOW" to "Low", "MEDIUM" to "Medium", "HIGH" to "High")) { (key, label) ->
+                        val active = selectedFilter == key
+                        Surface(
+                            modifier = Modifier.bounceClick {
+                                viewModel.soundFx.playClick()
+                                selectedFilter = key
+                            },
+                            shape = RoundedCornerShape(10.dp),
+                            color = if (active) colors.primaryIndigo else colors.card,
+                            border = BorderStroke(1.dp, if (active) colors.primaryIndigo else colors.cardBorder)
+                        ) {
+                            Text(
+                                text = label,
+                                color = if (active) Color.White else colors.textPrimary,
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 12.5.sp,
+                                maxLines = 1,
+                                softWrap = false,
+                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp)
+                            )
+                        }
                     }
                 }
             }
         }
 
-        // Arena Stake Cards
+        // Compact, Single-Line Arena Cards
         items(visibleTiers, key = { it.id }) { tier ->
+            val isFree = tier.entryCoins == 0L
             val (diffBg, diffTint) = when (tier.difficulty) {
+                "FREE" -> colors.mintSoft to colors.mintAccent
                 "LOW" -> colors.mintSoft to colors.mintAccent
                 "MEDIUM" -> colors.amberSoft to colors.amberAccent
                 else -> colors.lavenderSoft to colors.primaryIndigo
             }
             PRCard(
-                cornerRadius = 20.dp,
-                contentPadding = PaddingValues(16.dp),
-                onClick = { pendingTier = tier }
+                cornerRadius = 15.dp,
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 11.dp),
+                onClick = {
+                    viewModel.soundFx.playClick()
+                    pendingTier = tier
+                }
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
                     IconBadge(
                         icon = when (tier.difficulty) {
+                            "FREE" -> Icons.Rounded.School
                             "LOW" -> Icons.Rounded.Bolt
                             "MEDIUM" -> Icons.Rounded.WorkspacePremium
                             else -> Icons.Rounded.LocalFireDepartment
                         },
                         containerColor = diffBg,
                         iconTint = diffTint,
-                        size = 48.dp,
-                        cornerRadius = 15.dp
+                        size = 40.dp,
+                        cornerRadius = 12.dp
                     )
-                    Spacer(Modifier.width(12.dp))
+                    Spacer(Modifier.width(10.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Text(tier.label, style = MaterialTheme.typography.titleMedium, color = colors.textPrimary)
+                            Text(
+                                text = tier.label,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontSize = 14.5.sp,
+                                color = colors.textPrimary,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
                             Surface(shape = CircleShape, color = diffBg) {
                                 Text(
                                     text = tier.difficulty,
                                     color = diffTint,
-                                    fontSize = 10.sp,
+                                    fontSize = 9.5.sp,
                                     fontWeight = FontWeight.ExtraBold,
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                                    maxLines = 1,
+                                    softWrap = false,
+                                    modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
                                 )
                             }
                         }
-                        Spacer(Modifier.height(4.dp))
-                        Text("Entry: ${tier.entryCoins} Coins  •  Win: ${tier.winCoins} Coins", style = MaterialTheme.typography.bodyMedium, color = colors.textSecondary)
+                        Spacer(Modifier.height(3.dp))
+                        val infoText = if (isFree) {
+                            "Entry: FREE  •  Win: +${tier.winCoins} Coin"
+                        } else {
+                            "Entry: ${tier.entryCoins}  •  Win: ${tier.winCoins} Coins"
+                        }
+                        Text(
+                            text = infoText,
+                            fontSize = 12.sp,
+                            color = colors.textSecondary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
                     }
                     Spacer(Modifier.width(8.dp))
                     Box(
                         modifier = Modifier
                             .clip(CircleShape)
-                            .background(colors.heroGradient)
-                            .padding(horizontal = 16.dp, vertical = 9.dp)
+                            .background(if (isFree) colors.megaGradient else colors.heroGradient)
+                            .padding(horizontal = 14.dp, vertical = 7.dp)
                     ) {
-                        Text("Play", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        Text("Play", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp, maxLines = 1)
                     }
                 }
             }
         }
 
-        // Terms & Conditions Card (Admin-managed)
+        // Compact Terms & Conditions Card
         item {
             Surface(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(18.dp),
+                shape = RoundedCornerShape(14.dp),
                 color = colors.amberSoft,
                 border = BorderStroke(1.dp, colors.amberAccent.copy(alpha = 0.35f))
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
+                Column(modifier = Modifier.padding(12.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Rounded.Gavel, null, tint = Color(0xFFB45309), modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(8.dp))
-                        Text("Arena Rules & Terms", fontWeight = FontWeight.Bold, color = Color(0xFFB45309))
+                        Icon(Icons.Rounded.Gavel, null, tint = Color(0xFFB45309), modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("Arena Rules & Terms", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = Color(0xFFB45309))
                     }
-                    Spacer(Modifier.height(6.dp))
+                    Spacer(Modifier.height(4.dp))
                     Text(
                         text = config.termsAndConditions.ifBlank {
-                            "1. Entry coins are deducted when you start a match.\n2. Winning credits the prize instantly to your wallet.\n3. Draws refund 100% of your entry stake.\n4. Leaving a live match early forfeits the entry stake."
+                            "• Free Practice costs 0 coins and awards +1 coin on win.\n• Paid tables deduct entry coins on start and credit win coins instantly.\n• Draws refund 100% of paid entry stakes."
                         },
-                        style = MaterialTheme.typography.bodyMedium,
+                        fontSize = 12.sp,
+                        lineHeight = 17.sp,
                         color = colors.textPrimary
                     )
                 }
@@ -487,11 +551,12 @@ fun SuperOfferTicTacToeScreen(
 
     // Match Entry Confirmation Dialog
     pendingTier?.let { tier ->
+        val isFree = tier.entryCoins == 0L
         AlertDialog(
             onDismissRequest = { if (!starting) pendingTier = null },
             containerColor = colors.card,
-            icon = { IconBadge(Icons.Rounded.SportsEsports, colors.lavenderSoft, colors.primaryIndigo, size = 48.dp) },
-            title = { Text("Enter ${tier.label} Match?", fontWeight = FontWeight.Bold, color = colors.textPrimary, textAlign = TextAlign.Center) },
+            icon = { IconBadge(Icons.Rounded.SportsEsports, colors.lavenderSoft, colors.primaryIndigo, size = 44.dp) },
+            title = { Text("Enter ${tier.label}?", fontWeight = FontWeight.Bold, color = colors.textPrimary, textAlign = TextAlign.Center) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -500,11 +565,11 @@ fun SuperOfferTicTacToeScreen(
                     }
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         Text("Entry Stake", color = colors.textSecondary)
-                        Text("${tier.entryCoins} Coins", fontWeight = FontWeight.Bold, color = colors.textPrimary)
+                        Text(if (isFree) "FREE (0 Coins)" else "${tier.entryCoins} Coins", fontWeight = FontWeight.Bold, color = colors.textPrimary)
                     }
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         Text("Winner Prize", color = colors.textSecondary)
-                        Text("${tier.winCoins} Coins", fontWeight = FontWeight.ExtraBold, color = colors.mintAccent)
+                        Text("+${tier.winCoins} ${if (tier.winCoins == 1L) "Coin" else "Coins"}", fontWeight = FontWeight.ExtraBold, color = colors.mintAccent)
                     }
                 }
             },
@@ -512,12 +577,18 @@ fun SuperOfferTicTacToeScreen(
                 PrimaryGradientButton(
                     text = "Start Match",
                     isLoading = starting,
-                    height = 44.dp,
+                    height = 42.dp,
                     onClick = {
                         val uid = profile?.uid ?: return@PrimaryGradientButton
+                        if (isFree) {
+                            val id = tier.id
+                            pendingTier = null
+                            onEnterMatch(id)
+                            return@PrimaryGradientButton
+                        }
                         if ((profile?.coins ?: 0L) < tier.entryCoins) {
                             pendingTier = null
-                            viewModel.showToast("Not enough coins! You need ${tier.entryCoins} coins to join.", ToastType.ERROR)
+                            viewModel.showToast("Not enough coins! Play Free Practice or earn ${tier.entryCoins} coins.", ToastType.ERROR)
                             return@PrimaryGradientButton
                         }
                         scope.launch {
@@ -550,8 +621,8 @@ fun SuperOfferTicTacToeScreen(
 
 @Composable
 private fun ArenaRuleChip(text: String) {
-    Surface(shape = CircleShape, color = Color.White.copy(alpha = 0.18f)) {
-        Text(text, color = Color.White, fontSize = 11.5.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp))
+    Surface(shape = CircleShape, color = Color.White.copy(alpha = 0.2f)) {
+        Text(text, color = Color.White, fontSize = 10.5.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp))
     }
 }
 
@@ -571,13 +642,13 @@ fun TicTacToeMatchScreen(
     val config by viewModel.superOfferConfig.collectAsState()
 
     val tier = remember(config.tiers, tierId) {
-        val list = if (config.tiers.isNotEmpty()) config.tiers else defaultTicTacToeTiers()
-        list.find { it.id == tierId } ?: list.first()
+        buildArenaTiers(config.tiers).find { it.id == tierId } ?: FREE_PRACTICE_TIER
     }
+    val isFree = tier.entryCoins == 0L
 
     var board by remember { mutableStateOf(List(9) { "" }) }
     var aiThinking by remember { mutableStateOf(false) }
-    var matchResult by remember { mutableStateOf<String?>(null) } // null = LIVE, WIN, LOSS, DRAW
+    var matchResult by remember { mutableStateOf<String?>(null) }
     var winningLine by remember { mutableStateOf<List<Int>>(emptyList()) }
     var celebrate by remember { mutableStateOf(false) }
     var showLeaveDialog by remember { mutableStateOf(false) }
@@ -617,7 +688,7 @@ fun TicTacToeMatchScreen(
     fun pickAiMove(b: List<String>, difficulty: String): Int {
         val empty = b.indices.filter { b[it].isEmpty() }
         if (empty.isEmpty()) return -1
-        if (difficulty == "LOW" && Random.nextFloat() < 0.65f) return empty.random()
+        if ((difficulty == "FREE" || difficulty == "LOW") && Random.nextFloat() < 0.72f) return empty.random()
         if (difficulty == "MEDIUM" && Random.nextFloat() < 0.28f) return empty.random()
         val copy = b.toMutableList()
         var bestMove = empty.first()
@@ -641,13 +712,18 @@ fun TicTacToeMatchScreen(
         scope.launch {
             when (result) {
                 "WIN" -> {
+                    viewModel.soundFx.playCelebration()
                     viewModel.repo.adjustCoins(uid, tier.winCoins, true, "TIC_TAC_TOE_WIN", "Tic-Tac-Toe Win (${tier.label})")
                     celebrate = true
-                    viewModel.showToast("Victory! +${tier.winCoins} coins credited!", ToastType.SUCCESS)
+                    viewModel.showToast("Victory! +${tier.winCoins} ${if (tier.winCoins == 1L) "coin" else "coins"} credited!", ToastType.SUCCESS)
                 }
                 "DRAW" -> {
-                    viewModel.repo.adjustCoins(uid, tier.entryCoins, false, "TIC_TAC_TOE_WIN", "Tic-Tac-Toe Draw Refund")
-                    viewModel.showToast("Draw! Entry ${tier.entryCoins} coins refunded.", ToastType.INFO)
+                    if (!isFree) {
+                        viewModel.repo.adjustCoins(uid, tier.entryCoins, false, "TIC_TAC_TOE_WIN", "Tic-Tac-Toe Draw Refund")
+                        viewModel.showToast("Draw! Entry ${tier.entryCoins} coins refunded.", ToastType.INFO)
+                    } else {
+                        viewModel.showToast("Match Draw! Try again for +1 coin.", ToastType.INFO)
+                    }
                 }
                 "LOSS" -> {
                     viewModel.showToast("AI won this round. Rematch anytime!", ToastType.ERROR)
@@ -656,9 +732,7 @@ fun TicTacToeMatchScreen(
         }
     }
 
-    BackHandler(enabled = matchResult == null) {
-        showLeaveDialog = true
-    }
+    BackHandler(enabled = matchResult == null) { showLeaveDialog = true }
 
     Box(modifier = Modifier.fillMaxSize().background(colors.canvas)) {
         Column(
@@ -666,42 +740,40 @@ fun TicTacToeMatchScreen(
                 .fillMaxSize()
                 .statusBarsPadding()
                 .navigationBarsPadding()
-                .padding(horizontal = 18.dp, vertical = 12.dp),
+                .padding(horizontal = 16.dp, vertical = 10.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Top Match Bar
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 IconButton(onClick = { if (matchResult == null) showLeaveDialog = true else onExitToLobby() }) {
-                    Icon(Icons.Rounded.ArrowBackIosNew, "Leave", tint = colors.textPrimary, modifier = Modifier.size(20.dp))
+                    Icon(Icons.Rounded.ArrowBackIosNew, "Leave", tint = colors.textPrimary, modifier = Modifier.size(18.dp))
                 }
                 Surface(shape = CircleShape, color = colors.lavenderSoft) {
                     Text(
                         text = "${tier.label} • ${tier.difficulty}",
                         color = colors.primaryIndigo,
                         fontWeight = FontWeight.ExtraBold,
-                        fontSize = 12.5.sp,
-                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
+                        fontSize = 12.sp,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp)
                     )
                 }
                 Surface(shape = CircleShape, color = colors.mintSoft) {
-                    Row(modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Image(painterResource(R.drawable.ic_coin), null, modifier = Modifier.size(15.dp))
-                        Spacer(Modifier.width(5.dp))
-                        Text("Win ${tier.winCoins}", color = colors.mintAccent, fontWeight = FontWeight.ExtraBold, fontSize = 12.5.sp)
+                    Row(modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Image(painterResource(R.drawable.ic_coin), null, modifier = Modifier.size(14.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text("Win +${tier.winCoins}", color = colors.mintAccent, fontWeight = FontWeight.ExtraBold, fontSize = 12.sp)
                     }
                 }
             }
 
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(14.dp))
 
-            // VS Scoreboard Header
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 val playerTurn = matchResult == null && !aiThinking
@@ -714,7 +786,7 @@ fun TicTacToeMatchScreen(
                     modifier = Modifier.weight(1f)
                 )
                 Surface(shape = CircleShape, color = colors.card, border = BorderStroke(1.dp, colors.cardBorder)) {
-                    Text("VS", fontWeight = FontWeight.ExtraBold, color = colors.textSecondary, fontSize = 12.sp, modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp))
+                    Text("VS", fontWeight = FontWeight.ExtraBold, color = colors.textSecondary, fontSize = 11.sp, modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp))
                 }
                 PlayerTurnCard(
                     name = "AI Bot",
@@ -726,9 +798,8 @@ fun TicTacToeMatchScreen(
                 )
             }
 
-            Spacer(Modifier.height(18.dp))
+            Spacer(Modifier.height(14.dp))
 
-            // Live Turn Status Pill
             Surface(
                 shape = CircleShape,
                 color = when (matchResult) {
@@ -740,9 +811,9 @@ fun TicTacToeMatchScreen(
             ) {
                 Text(
                     text = when {
-                        matchResult == "WIN" -> "You Won +${tier.winCoins} Coins!"
+                        matchResult == "WIN" -> "You Won +${tier.winCoins} ${if (tier.winCoins == 1L) "Coin" else "Coins"}!"
                         matchResult == "LOSS" -> "AI Won This Round"
-                        matchResult == "DRAW" -> "Match Draw — ${tier.entryCoins} Coins Refunded"
+                        matchResult == "DRAW" -> if (isFree) "Match Draw — Try Again!" else "Draw — ${tier.entryCoins} Coins Refunded"
                         aiThinking -> "AI is making a move..."
                         else -> "Your Turn — Tap any square"
                     },
@@ -753,22 +824,21 @@ fun TicTacToeMatchScreen(
                         else -> if (aiThinking) Color(0xFFB45309) else colors.primaryIndigo
                     },
                     fontWeight = FontWeight.Bold,
-                    fontSize = 13.5.sp,
-                    modifier = Modifier.padding(horizontal = 18.dp, vertical = 8.dp)
+                    fontSize = 13.sp,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 7.dp)
                 )
             }
 
             Spacer(Modifier.weight(1f))
 
-            // Dedicated Full-Width Animated 3x3 Board
             PRCard(
                 modifier = Modifier.fillMaxWidth(),
-                cornerRadius = 28.dp,
-                contentPadding = PaddingValues(16.dp)
+                cornerRadius = 24.dp,
+                contentPadding = PaddingValues(14.dp)
             ) {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     for (r in 0..2) {
-                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
                             for (c in 0..2) {
                                 val idx = r * 3 + c
                                 val cell = board[idx]
@@ -778,6 +848,7 @@ fun TicTacToeMatchScreen(
                                     isWinningCell = isWinCell,
                                     enabled = matchResult == null && !aiThinking && cell.isEmpty(),
                                     onClick = {
+                                        viewModel.soundFx.playClick()
                                         val updated = board.toMutableList().apply { this[idx] = "X" }
                                         board = updated
                                         val playerWin = checkWinner(updated)
@@ -788,7 +859,7 @@ fun TicTacToeMatchScreen(
                                         } else {
                                             aiThinking = true
                                             scope.launch {
-                                                delay(460)
+                                                delay(420)
                                                 val aiMove = pickAiMove(updated, tier.difficulty)
                                                 if (aiMove != -1) {
                                                     val afterAi = updated.toMutableList().apply { this[aiMove] = "O" }
@@ -811,18 +882,24 @@ fun TicTacToeMatchScreen(
 
             Spacer(Modifier.weight(1f))
 
-            // Bottom Match Controls (Post-Match Rematch / Back to Lobby)
             if (matchResult != null) {
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
                     SecondaryOutlineButton(
-                        text = "Change Stake",
+                        text = "Change Table",
                         onClick = onExitToLobby,
                         modifier = Modifier.weight(1f)
                     )
                     PrimaryGradientButton(
-                        text = "Play Again (${tier.entryCoins})",
+                        text = if (isFree) "Play Again (Free)" else "Play Again (${tier.entryCoins})",
                         isLoading = restarting,
                         onClick = {
+                            if (isFree) {
+                                celebrate = false
+                                board = List(9) { "" }
+                                winningLine = emptyList()
+                                matchResult = null
+                                return@PrimaryGradientButton
+                            }
                             val uid = profile?.uid ?: return@PrimaryGradientButton
                             if ((profile?.coins ?: 0L) < tier.entryCoins) {
                                 viewModel.showToast("Not enough coins for rematch!", ToastType.ERROR)
@@ -848,17 +925,17 @@ fun TicTacToeMatchScreen(
                                 }
                             }
                         },
-                        modifier = Modifier.weight(1.2f)
+                        modifier = Modifier.weight(1.25f)
                     )
                 }
             } else {
                 Text(
-                    text = "Stake locked: ${tier.entryCoins} Coins • Balance: ${profile?.coins ?: 0} Coins",
+                    text = if (isFree) "Free Practice Mode • Win +1 Coin" else "Stake locked: ${tier.entryCoins} Coins • Balance: ${profile?.coins ?: 0} Coins",
                     style = MaterialTheme.typography.labelSmall,
                     color = colors.textSecondary
                 )
             }
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(6.dp))
         }
 
         CelebrationBurstOverlay(visible = celebrate)
@@ -869,16 +946,20 @@ fun TicTacToeMatchScreen(
             onDismissRequest = { showLeaveDialog = false },
             containerColor = colors.card,
             icon = { Icon(Icons.Rounded.WarningAmber, null, tint = colors.amberAccent) },
-            title = { Text("Leave Live Match?", fontWeight = FontWeight.Bold, color = colors.textPrimary) },
-            text = { Text("Leaving mid-match forfeits your ${tier.entryCoins} coins entry stake. Are you sure?", color = colors.textSecondary) },
+            title = { Text("Leave Match?", fontWeight = FontWeight.Bold, color = colors.textPrimary) },
+            text = {
+                Text(
+                    text = if (isFree) "Are you sure you want to leave this practice match?"
+                    else "Leaving mid-match forfeits your ${tier.entryCoins} coins entry stake. Are you sure?",
+                    color = colors.textSecondary
+                )
+            },
             confirmButton = {
                 TextButton(onClick = { showLeaveDialog = false; onExitToLobby() }) {
-                    Text("Forfeit & Leave", color = colors.roseAccent, fontWeight = FontWeight.Bold)
+                    Text(if (isFree) "Leave" else "Forfeit & Leave", color = colors.roseAccent, fontWeight = FontWeight.Bold)
                 }
             },
-            dismissButton = {
-                TextButton(onClick = { showLeaveDialog = false }) { Text("Keep Playing") }
-            }
+            dismissButton = { TextButton(onClick = { showLeaveDialog = false }) { Text("Keep Playing") } }
         )
     }
 }
@@ -896,24 +977,18 @@ private fun PlayerTurnCard(
     val scale by animateFloatAsState(if (active) 1.03f else 0.98f, spring(stiffness = Spring.StiffnessMediumLow), label = "turnScale")
     Surface(
         modifier = modifier.scale(scale),
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(16.dp),
         color = if (active) softBg else colors.card,
         border = BorderStroke(if (active) 2.dp else 1.dp, if (active) accent else colors.cardBorder),
         shadowElevation = if (active) 4.dp else 1.dp
     ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier.size(36.dp).clip(CircleShape).background(accent),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(symbol, color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 18.sp)
+        Row(modifier = Modifier.padding(horizontal = 10.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(modifier = Modifier.size(32.dp).clip(CircleShape).background(accent), contentAlignment = Alignment.Center) {
+                Text(symbol, color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 16.sp)
             }
-            Spacer(Modifier.width(10.dp))
+            Spacer(Modifier.width(8.dp))
             Column {
-                Text(name, fontWeight = FontWeight.Bold, color = colors.textPrimary, maxLines = 1, fontSize = 14.sp)
+                Text(name, fontWeight = FontWeight.Bold, color = colors.textPrimary, maxLines = 1, fontSize = 13.5.sp)
                 Text(if (active) "Playing..." else "Waiting", style = MaterialTheme.typography.labelSmall, color = if (active) accent else colors.textSecondary)
             }
         }
@@ -933,13 +1008,13 @@ private fun AnimatedTicTacToeCell(
     LaunchedEffect(symbol) {
         if (symbol.isNotEmpty()) {
             drawProgress.snapTo(0f)
-            drawProgress.animateTo(1f, tween(280, easing = FastOutSlowInEasing))
+            drawProgress.animateTo(1f, tween(260, easing = FastOutSlowInEasing))
         }
     }
 
     Surface(
         modifier = modifier.bounceClick(enabled = enabled, onClick = onClick),
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(18.dp),
         color = when {
             isWinningCell -> colors.mintSoft
             symbol == "X" -> colors.lavenderSoft
@@ -956,31 +1031,19 @@ private fun AnimatedTicTacToeCell(
             }
         )
     ) {
-        Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize().padding(20.dp)) {
+        Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize().padding(18.dp)) {
             if (symbol == "X") {
                 val p = drawProgress.value
                 val xBrush = Brush.linearGradient(listOf(colors.primaryIndigo, colors.primaryViolet))
                 Canvas(modifier = Modifier.fillMaxSize()) {
-                    val stroke = Stroke(width = 9.dp.toPx(), cap = StrokeCap.Round)
+                    val stroke = Stroke(width = 8.dp.toPx(), cap = StrokeCap.Round)
                     val p1 = (p * 2f).coerceIn(0f, 1f)
                     val p2 = ((p - 0.5f) * 2f).coerceIn(0f, 1f)
                     if (p1 > 0f) {
-                        drawLine(
-                            brush = xBrush,
-                            start = Offset(0f, 0f),
-                            end = Offset(size.width * p1, size.height * p1),
-                            strokeWidth = stroke.width,
-                            cap = StrokeCap.Round
-                        )
+                        drawLine(brush = xBrush, start = Offset(0f, 0f), end = Offset(size.width * p1, size.height * p1), strokeWidth = stroke.width, cap = StrokeCap.Round)
                     }
                     if (p2 > 0f) {
-                        drawLine(
-                            brush = xBrush,
-                            start = Offset(size.width, 0f),
-                            end = Offset(size.width * (1f - p2), size.height * p2),
-                            strokeWidth = stroke.width,
-                            cap = StrokeCap.Round
-                        )
+                        drawLine(brush = xBrush, start = Offset(size.width, 0f), end = Offset(size.width * (1f - p2), size.height * p2), strokeWidth = stroke.width, cap = StrokeCap.Round)
                     }
                 }
             } else if (symbol == "O") {
@@ -994,7 +1057,7 @@ private fun AnimatedTicTacToeCell(
                         useCenter = false,
                         topLeft = Offset.Zero,
                         size = Size(size.width, size.height),
-                        style = Stroke(width = 9.dp.toPx(), cap = StrokeCap.Round)
+                        style = Stroke(width = 8.dp.toPx(), cap = StrokeCap.Round)
                     )
                 }
             }
