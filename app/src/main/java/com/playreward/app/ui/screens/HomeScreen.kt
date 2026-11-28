@@ -197,7 +197,7 @@ fun HomeScreen(
                                     }
                                     Surface(shape = CircleShape, color = Color(0xFF10B981).copy(alpha = 0.25f), border = BorderStroke(1.dp, Color(0xFF34D399).copy(alpha = 0.6f))) {
                                         Text(
-                                            text = "₹${String.format("%.2f", approxInr)} INR",
+                                            text = "₹${String.format("%.2f", profile?.inrBalance ?: 0.0)} INR",
                                             color = Color.White,
                                             fontSize = 11.5.sp,
                                             fontWeight = FontWeight.ExtraBold,
