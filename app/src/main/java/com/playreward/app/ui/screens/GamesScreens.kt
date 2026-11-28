@@ -8,6 +8,11 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
@@ -52,6 +57,8 @@ import com.playreward.app.ui.theme.PRTheme
 import com.playreward.app.ui.viewmodel.MainViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlin.math.cos
+import kotlin.math.sin
 import kotlin.random.Random
 
 @Composable
@@ -1078,10 +1085,18 @@ fun TicTacToeMatchScreen(
                     contentPadding = PaddingValues(22.dp)
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
-                        // Top Emblem Badge
+                        // Animated Bouncing Emblem Badge
+                        val trophyAnim = rememberInfiniteTransition(label = "popupTrophy")
+                        val trophyScale by trophyAnim.animateFloat(
+                            initialValue = 0.93f,
+                            targetValue = 1.08f,
+                            animationSpec = infiniteRepeatable(tween(750), RepeatMode.Reverse),
+                            label = "trophyBounce"
+                        )
                         Box(
                             modifier = Modifier
                                 .size(78.dp)
+                                .scale(if (isWin) trophyScale else 1f)
                                 .clip(CircleShape)
                                 .background(
                                     when {
@@ -1240,7 +1255,14 @@ private fun PlayerTurnCard(
     modifier: Modifier = Modifier
 ) {
     val colors = PRTheme.colors
-    val scale by animateFloatAsState(if (active) 1.03f else 0.98f, spring(stiffness = Spring.StiffnessMediumLow), label = "turnScale")
+    val activePulse = rememberInfiniteTransition(label = "activeTurnPulse")
+    val pulseVal by activePulse.animateFloat(
+        initialValue = 1.0f,
+        targetValue = 1.035f,
+        animationSpec = infiniteRepeatable(tween(700), RepeatMode.Reverse),
+        label = "pulseVal"
+    )
+    val scale by animateFloatAsState(if (active) pulseVal else 0.97f, spring(stiffness = Spring.StiffnessMediumLow), label = "turnScale")
     Surface(
         modifier = modifier.scale(scale),
         shape = RoundedCornerShape(15.dp),
@@ -1272,15 +1294,44 @@ private fun AnimatedTicTacToeCell(
 ) {
     val colors = PRTheme.colors
     val drawProgress = remember(symbol) { Animatable(0f) }
+    val burstProgress = remember(symbol) { Animatable(0f) }
+    val popScale = remember(symbol) { Animatable(1f) }
+
     LaunchedEffect(symbol) {
         if (symbol.isNotEmpty()) {
             drawProgress.snapTo(0f)
-            drawProgress.animateTo(1f, tween(250, easing = FastOutSlowInEasing))
+            burstProgress.snapTo(0f)
+            popScale.snapTo(0.84f)
+            launch {
+                popScale.animateTo(
+                    1f,
+                    spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium)
+                )
+            }
+            launch {
+                drawProgress.animateTo(1f, tween(270, easing = FastOutSlowInEasing))
+            }
+            launch {
+                burstProgress.animateTo(1f, tween(520, easing = FastOutSlowInEasing))
+            }
         }
     }
 
+    val winPulse = rememberInfiniteTransition(label = "winCellPulse")
+    val winScale by winPulse.animateFloat(
+        initialValue = 0.97f,
+        targetValue = 1.04f,
+        animationSpec = infiniteRepeatable(tween(650), RepeatMode.Reverse),
+        label = "winScale"
+    )
+
+    val effectiveScale = if (isWinningCell) winScale else popScale.value
+    val accentColor = if (symbol == "X") colors.primaryIndigo else Color(0xFFF97316)
+
     Surface(
-        modifier = modifier.bounceClick(enabled = enabled, onClick = onClick),
+        modifier = modifier
+            .scale(effectiveScale)
+            .bounceClick(enabled = enabled, onClick = onClick),
         shape = RoundedCornerShape(18.dp),
         color = when {
             isWinningCell -> colors.mintSoft
@@ -1289,7 +1340,7 @@ private fun AnimatedTicTacToeCell(
             else -> colors.inputBg
         },
         border = BorderStroke(
-            width = if (isWinningCell || isRecentMove) 2.4.dp else 1.2.dp,
+            width = if (isWinningCell || isRecentMove) 2.5.dp else 1.2.dp,
             color = when {
                 isWinningCell -> colors.mintAccent
                 isRecentMove -> colors.amberAccent
@@ -1297,36 +1348,68 @@ private fun AnimatedTicTacToeCell(
                 symbol == "O" -> colors.amberAccent.copy(alpha = 0.45f)
                 else -> colors.cardBorder
             }
-        )
+        ),
+        shadowElevation = if (isWinningCell) 6.dp else if (symbol.isNotEmpty()) 2.dp else 0.dp
     ) {
-        Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize().padding(18.dp)) {
-            if (symbol == "X") {
-                val p = drawProgress.value
-                val xBrush = Brush.linearGradient(listOf(colors.primaryIndigo, colors.primaryViolet))
+        Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+            // Shockwave ripple ring + 10-particle sparkle burst on every move!
+            if (symbol.isNotEmpty() && burstProgress.value < 0.99f) {
+                val bp = burstProgress.value
+                val alpha = (1f - bp).coerceIn(0f, 1f)
                 Canvas(modifier = Modifier.fillMaxSize()) {
-                    val stroke = Stroke(width = 8.dp.toPx(), cap = StrokeCap.Round)
-                    val p1 = (p * 2f).coerceIn(0f, 1f)
-                    val p2 = ((p - 0.5f) * 2f).coerceIn(0f, 1f)
-                    if (p1 > 0f) {
-                        drawLine(brush = xBrush, start = Offset(0f, 0f), end = Offset(size.width * p1, size.height * p1), strokeWidth = stroke.width, cap = StrokeCap.Round)
-                    }
-                    if (p2 > 0f) {
-                        drawLine(brush = xBrush, start = Offset(size.width, 0f), end = Offset(size.width * (1f - p2), size.height * p2), strokeWidth = stroke.width, cap = StrokeCap.Round)
+                    val cx = size.width / 2f
+                    val cy = size.height / 2f
+                    val maxR = size.minDimension * 0.48f
+                    drawCircle(
+                        color = accentColor.copy(alpha = alpha * 0.45f),
+                        radius = maxR * bp,
+                        center = Offset(cx, cy),
+                        style = Stroke(width = (3.5f * alpha).dp.toPx())
+                    )
+                    for (i in 0 until 10) {
+                        val angle = (i * 36.0) * (Math.PI / 180.0)
+                        val dist = maxR * 0.3f + maxR * 0.7f * bp
+                        val px = cx + (cos(angle) * dist).toFloat()
+                        val py = cy + (sin(angle) * dist).toFloat()
+                        drawCircle(
+                            color = if (i % 2 == 0) accentColor.copy(alpha = alpha) else Color(0xFFFBBF24).copy(alpha = alpha),
+                            radius = (3.2f * alpha + 1f).dp.toPx(),
+                            center = Offset(px, py)
+                        )
                     }
                 }
-            } else if (symbol == "O") {
-                val p = drawProgress.value
-                val oBrush = Brush.linearGradient(listOf(Color(0xFFFBBF24), Color(0xFFF97316)))
-                Canvas(modifier = Modifier.fillMaxSize()) {
-                    drawArc(
-                        brush = oBrush,
-                        startAngle = -90f,
-                        sweepAngle = 360f * p,
-                        useCenter = false,
-                        topLeft = Offset.Zero,
-                        size = Size(size.width, size.height),
-                        style = Stroke(width = 8.dp.toPx(), cap = StrokeCap.Round)
-                    )
+            }
+
+            // Crisp animated X / O vector stroke
+            Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize().padding(18.dp)) {
+                if (symbol == "X") {
+                    val p = drawProgress.value
+                    val xBrush = Brush.linearGradient(listOf(colors.primaryIndigo, colors.primaryViolet))
+                    Canvas(modifier = Modifier.fillMaxSize()) {
+                        val stroke = Stroke(width = 8.5.dp.toPx(), cap = StrokeCap.Round)
+                        val p1 = (p * 2f).coerceIn(0f, 1f)
+                        val p2 = ((p - 0.5f) * 2f).coerceIn(0f, 1f)
+                        if (p1 > 0f) {
+                            drawLine(brush = xBrush, start = Offset(0f, 0f), end = Offset(size.width * p1, size.height * p1), strokeWidth = stroke.width, cap = StrokeCap.Round)
+                        }
+                        if (p2 > 0f) {
+                            drawLine(brush = xBrush, start = Offset(size.width, 0f), end = Offset(size.width * (1f - p2), size.height * p2), strokeWidth = stroke.width, cap = StrokeCap.Round)
+                        }
+                    }
+                } else if (symbol == "O") {
+                    val p = drawProgress.value
+                    val oBrush = Brush.linearGradient(listOf(Color(0xFFFBBF24), Color(0xFFF97316)))
+                    Canvas(modifier = Modifier.fillMaxSize()) {
+                        drawArc(
+                            brush = oBrush,
+                            startAngle = -90f,
+                            sweepAngle = 360f * p,
+                            useCenter = false,
+                            topLeft = Offset.Zero,
+                            size = Size(size.width, size.height),
+                            style = Stroke(width = 8.5.dp.toPx(), cap = StrokeCap.Round)
+                        )
+                    }
                 }
             }
         }
