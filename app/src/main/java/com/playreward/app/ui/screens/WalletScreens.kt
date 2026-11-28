@@ -118,7 +118,7 @@ fun WalletScreen(
                     }
                     Spacer(Modifier.height(10.dp))
                     Text(
-                        text = "$coinsPerInr Coins = ₹1 INR  •  Min Withdraw: ${appConfig.minWithdrawalCoins} Coins",
+                        text = "$coinsPerInr Coins = ₹1 INR  •  Min Withdraw: ₹${appConfig.minWithdrawalCoins / coinsPerInr} INR",
                         color = Color.White.copy(alpha = 0.86f),
                         fontSize = 11.5.sp
                     )
@@ -208,7 +208,7 @@ fun WalletScreen(
 }
 
 // ============================================================================
-// SCREEN 2: DEDICATED WITHDRAWAL SCREEN
+// SCREEN 2: DEDICATED INR WITHDRAWAL SCREEN (CONVERTED MONEY ONLY)
 // ============================================================================
 
 @Composable
@@ -223,18 +223,21 @@ fun WithdrawScreen(
     val appConfig by viewModel.appConfig.collectAsState()
 
     val pm = profile?.payoutMethods ?: PayoutMethods()
-    val coinsPerInr = appConfig.coinsPerInr.coerceAtLeast(1L)
+    val coinsPerInr = appConfig.coinsPerInr.coerceAtLeast(1L).toDouble()
+    val minInr = appConfig.minWithdrawalCoins.toDouble() / coinsPerInr
+    val maxInr = appConfig.maxWithdrawalCoins.toDouble() / coinsPerInr
+    val availableInr = profile?.inrBalance ?: 0.0
+
     var selectedMethod by remember { mutableStateOf("UPI") }
-    var withdrawInput by remember { mutableStateOf("") }
+    var withdrawInrInput by remember { mutableStateOf("") }
     var showConfirm by remember { mutableStateOf(false) }
     var submitting by remember { mutableStateOf(false) }
 
-    val enteredCoins = withdrawInput.toLongOrNull() ?: 0L
-    val estimatedInr = enteredCoins.toDouble() / coinsPerInr.toDouble()
-    val presets = remember(appConfig.minWithdrawalCoins, appConfig.maxWithdrawalCoins) {
-        listOf(10000L, 25000L, 50000L, 100000L)
-            .filter { it in appConfig.minWithdrawalCoins..appConfig.maxWithdrawalCoins }
-            .ifEmpty { listOf(appConfig.minWithdrawalCoins) }
+    val enteredInr = withdrawInrInput.toDoubleOrNull() ?: 0.0
+    val presets = remember(minInr, maxInr) {
+        listOf(10.0, 25.0, 50.0, 100.0, 200.0, 500.0)
+            .filter { it >= minInr && it <= maxInr }
+            .ifEmpty { listOf(minInr) }
     }
 
     LazyColumn(
@@ -245,12 +248,33 @@ fun WithdrawScreen(
         item {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
                 IconButton(onClick = onBack) { Icon(Icons.Rounded.ArrowBackIosNew, null, tint = colors.textPrimary, modifier = Modifier.size(20.dp)) }
-                Text("Withdraw Rewards", style = MaterialTheme.typography.titleLarge, color = colors.textPrimary, modifier = Modifier.weight(1f))
-                Surface(shape = CircleShape, color = colors.amberSoft) {
-                    Row(modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Image(painterResource(R.drawable.ic_coin), null, modifier = Modifier.size(15.dp))
-                        Spacer(Modifier.width(5.dp))
-                        Text("${profile?.coins ?: 0}", color = Color(0xFFB45309), fontWeight = FontWeight.ExtraBold, fontSize = 13.sp)
+                Text("Withdraw Money", style = MaterialTheme.typography.titleLarge, color = colors.textPrimary, modifier = Modifier.weight(1f))
+                Surface(shape = CircleShape, color = colors.mintSoft, border = BorderStroke(1.dp, colors.mintAccent.copy(alpha = 0.4f))) {
+                    Row(modifier = Modifier.padding(horizontal = 11.dp, vertical = 5.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Rounded.CurrencyRupee, null, tint = colors.mintAccent, modifier = Modifier.size(14.dp))
+                        Text(String.format("%.2f", availableInr), color = colors.mintAccent, fontWeight = FontWeight.ExtraBold, fontSize = 13.sp)
+                    }
+                }
+            }
+        }
+
+        // Info note if user has coins but low INR balance
+        if (availableInr < minInr) {
+            item {
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(14.dp),
+                    color = colors.amberSoft,
+                    border = BorderStroke(1.dp, colors.amberAccent.copy(alpha = 0.4f))
+                ) {
+                    Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Rounded.Info, null, tint = Color(0xFFB45309), modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            text = "Only converted INR balance can be withdrawn (Min ₹${String.format("%.0f", minInr)}). Convert your coins to INR first.",
+                            fontSize = 12.sp,
+                            color = colors.textPrimary
+                        )
                     }
                 }
             }
@@ -288,30 +312,44 @@ fun WithdrawScreen(
             }
         }
 
-        // Amount Selection Card
+        // INR Amount Selection Card
         item {
             PRCard(cornerRadius = 16.dp) {
-                Text("Withdrawal Amount", style = MaterialTheme.typography.titleMedium, color = colors.textPrimary)
-                Text("Min ${appConfig.minWithdrawalCoins} • Max ${appConfig.maxWithdrawalCoins} coins", style = MaterialTheme.typography.labelSmall, color = colors.textSecondary)
+                Text("Withdrawal Amount (INR)", style = MaterialTheme.typography.titleMedium, color = colors.textPrimary)
+                Text("Min ₹${String.format("%.0f", minInr)} • Max ₹${String.format("%.0f", maxInr)} • Available ₹${String.format("%.2f", availableInr)}", style = MaterialTheme.typography.labelSmall, color = colors.textSecondary)
                 Spacer(Modifier.height(10.dp))
 
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     items(presets) { preset ->
                         FilterChip(
-                            selected = enteredCoins == preset,
-                            onClick = { withdrawInput = preset.toString() },
-                            label = { Text("$preset", fontWeight = FontWeight.SemiBold) }
+                            selected = enteredInr == preset,
+                            onClick = { withdrawInrInput = preset.toInt().toString() },
+                            label = { Text("₹${preset.toInt()}", fontWeight = FontWeight.SemiBold) }
                         )
+                    }
+                    if (availableInr >= minInr) {
+                        item {
+                            val maxUsable = availableInr.coerceAtMost(maxInr)
+                            FilterChip(
+                                selected = false,
+                                onClick = { withdrawInrInput = String.format("%.2f", maxUsable) },
+                                label = { Text("MAX", fontWeight = FontWeight.Bold) }
+                            )
+                        }
                     }
                 }
                 Spacer(Modifier.height(10.dp))
                 PRTextField(
-                    value = withdrawInput,
-                    onValueChange = { withdrawInput = it.filter { c -> c.isDigit() } },
-                    label = "Enter Coins",
-                    placeholder = "e.g. ${appConfig.minWithdrawalCoins}",
-                    leadingIcon = Icons.Rounded.MonetizationOn,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                    value = withdrawInrInput,
+                    onValueChange = { s ->
+                        if (s.count { it == '.' } <= 1) {
+                            withdrawInrInput = s.filter { c -> c.isDigit() || c == '.' }
+                        }
+                    },
+                    label = "Enter Amount in ₹ (INR)",
+                    placeholder = "e.g. ${minInr.toInt()}",
+                    leadingIcon = Icons.Rounded.CurrencyRupee,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
                 )
             }
         }
@@ -321,16 +359,16 @@ fun WithdrawScreen(
             PRCard(cornerRadius = 16.dp) {
                 Text("Payout Summary", style = MaterialTheme.typography.titleMedium, color = colors.textPrimary)
                 Spacer(Modifier.height(10.dp))
-                SummaryRow("Coins to Deduct", "$enteredCoins Coins")
+                SummaryRow("Available INR Balance", "₹${String.format("%.2f", availableInr)}")
                 Spacer(Modifier.height(6.dp))
-                SummaryRow("Payout Value (INR)", "₹${String.format("%.2f", estimatedInr)}", highlight = colors.mintAccent)
+                SummaryRow("Withdrawal Amount", "₹${String.format("%.2f", enteredInr)}", highlight = colors.mintAccent)
                 Spacer(Modifier.height(6.dp))
                 SummaryRow("Processing Time", "24 – 48 Hours")
                 Spacer(Modifier.height(14.dp))
                 PrimaryGradientButton(
-                    text = "Withdraw ₹${String.format("%.2f", estimatedInr)}",
+                    text = "Withdraw ₹${String.format("%.2f", enteredInr)}",
                     isLoading = submitting,
-                    enabled = enteredCoins in appConfig.minWithdrawalCoins..appConfig.maxWithdrawalCoins,
+                    enabled = enteredInr >= minInr && enteredInr <= maxInr && enteredInr <= availableInr + 0.001,
                     leadingIcon = Icons.Rounded.Send,
                     onClick = { showConfirm = true },
                     modifier = Modifier.fillMaxWidth()
@@ -345,7 +383,7 @@ fun WithdrawScreen(
             containerColor = colors.card,
             title = { Text("Confirm Withdrawal", fontWeight = FontWeight.Bold, color = colors.textPrimary) },
             text = {
-                Text("Withdraw $enteredCoins coins (₹${String.format("%.2f", estimatedInr)}) via $selectedMethod?", color = colors.textSecondary)
+                Text("Withdraw ₹${String.format("%.2f", enteredInr)} INR from your converted balance via $selectedMethod?", color = colors.textSecondary)
             },
             confirmButton = {
                 PrimaryGradientButton(
@@ -356,11 +394,11 @@ fun WithdrawScreen(
                         val p = profile ?: return@PrimaryGradientButton
                         scope.launch {
                             submitting = true
-                            val res = viewModel.repo.requestWithdrawal(p.uid, p.fullName, enteredCoins, selectedMethod, p.payoutMethods, appConfig)
+                            val res = viewModel.repo.requestWithdrawal(p.uid, p.fullName, enteredInr, selectedMethod, p.payoutMethods, appConfig)
                             submitting = false
                             if (res.isSuccess) {
-                                withdrawInput = ""
-                                viewModel.showToast("Withdrawal submitted for admin approval!", ToastType.SUCCESS)
+                                withdrawInrInput = ""
+                                viewModel.showToast("Withdrawal ₹${String.format("%.2f", enteredInr)} submitted for approval!", ToastType.SUCCESS)
                                 onBack()
                             } else {
                                 viewModel.showToast(res.exceptionOrNull()?.message ?: "Withdrawal failed.", ToastType.ERROR)
@@ -575,7 +613,8 @@ fun WalletHistoryScreen(
 @Composable
 private fun TransactionRowCard(tx: TransactionItem) {
     val colors = PRTheme.colors
-    val isPositive = tx.amountCoins >= 0
+    val isInrOnly = tx.amountCoins == 0L && tx.amountInr != 0.0
+    val isPositive = if (isInrOnly) tx.amountInr >= 0.0 else tx.amountCoins >= 0
     val dateStr = remember(tx.createdAt) {
         if (tx.createdAt > 0) SimpleDateFormat("dd MMM, hh:mm a", Locale.getDefault()).format(Date(tx.createdAt)) else ""
     }
@@ -594,7 +633,7 @@ private fun TransactionRowCard(tx: TransactionItem) {
                 Text("$dateStr • ${tx.status}", style = MaterialTheme.typography.labelSmall, color = colors.textSecondary)
             }
             Text(
-                text = "${if (isPositive) "+" else ""}${tx.amountCoins}",
+                text = if (isInrOnly) "${if (tx.amountInr >= 0) "+" else "-"}₹${String.format("%.2f", kotlin.math.abs(tx.amountInr))}" else "${if (isPositive) "+" else ""}${tx.amountCoins}",
                 fontWeight = FontWeight.ExtraBold,
                 color = if (isPositive) colors.mintAccent else colors.roseAccent,
                 fontSize = 14.sp

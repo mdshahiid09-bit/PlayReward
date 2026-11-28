@@ -669,20 +669,53 @@ class FirebaseRepository {
     suspend fun requestWithdrawal(
         uid: String,
         userName: String,
-        coins: Long,
+        inrAmount: Double,
         method: String,
         payoutMethods: PayoutMethods,
         config: AppConfig
     ): Result<Unit> = runCatching {
-        if (coins < config.minWithdrawalCoins) error("Minimum withdrawal is ${config.minWithdrawalCoins} coins.")
-        if (coins > config.maxWithdrawalCoins) error("Maximum withdrawal is ${config.maxWithdrawalCoins} coins.")
+        val cpi = config.coinsPerInr.coerceAtLeast(1L).toDouble()
+        val minInr = config.minWithdrawalCoins.toDouble() / cpi
+        val maxInr = config.maxWithdrawalCoins.toDouble() / cpi
+
+        if (inrAmount < minInr) error("Minimum withdrawal is ₹${String.format("%.2f", minInr)} INR.")
+        if (inrAmount > maxInr) error("Maximum withdrawal is ₹${String.format("%.2f", maxInr)} INR.")
         if (method == "UPI" && payoutMethods.upiId.isBlank()) error("Please save your UPI ID in Wallet Settings first.")
         if (method == "BANK" && (payoutMethods.bankAccountNumber.isBlank() || payoutMethods.bankIfsc.isBlank())) {
             error("Please save your Bank Account details in Wallet Settings first.")
         }
 
-        val inrAmount = coins.toDouble() / config.coinsPerInr.coerceAtLeast(1L).toDouble()
-        adjustCoins(uid, -coins, countAsEarned = false, txType = "WITHDRAWAL", txTitle = "Withdrawal via $method").getOrThrow()
+        // Atomically deduct from converted INR balance (inrBalance)
+        val remainingInr = suspendCancellableCoroutine<Double> { cont ->
+            val ref = db.getReference("users/$uid/inrBalance")
+            ref.runTransaction(object : Transaction.Handler {
+                override fun doTransaction(currentData: MutableData): Transaction.Result {
+                    val current = currentData.getValue(Double::class.java)
+                        ?: currentData.getValue(Long::class.java)?.toDouble() ?: 0.0
+                    if (current + 0.0001 < inrAmount) return Transaction.abort()
+                    val updated = ((current - inrAmount) * 100.0).toLong() / 100.0
+                    currentData.value = updated.coerceAtLeast(0.0)
+                    return Transaction.success(currentData)
+                }
+                override fun onComplete(error: DatabaseError?, committed: Boolean, snapshot: DataSnapshot?) {
+                    if (error != null) cont.resume(-1.0)
+                    else if (!committed) cont.resume(-2.0)
+                    else cont.resume(snapshot?.getValue(Double::class.java) ?: 0.0)
+                }
+            })
+        }
+        if (remainingInr == -2.0) error("Insufficient INR balance. Convert your coins to INR first.")
+        if (remainingInr < 0.0) error("Withdrawal failed. Please try again.")
+
+        val equivalentCoins = (inrAmount * cpi).toLong()
+        logTransaction(
+            uid = uid,
+            type = "WITHDRAWAL",
+            title = "Withdrawal ₹${String.format("%.2f", inrAmount)} via $method",
+            amountCoins = 0L,
+            amountInr = -inrAmount,
+            status = "PENDING"
+        )
 
         val wId = db.getReference("withdrawals").push().key ?: UUID.randomUUID().toString()
         val payload = mapOf(
@@ -690,7 +723,7 @@ class FirebaseRepository {
             "uid" to uid,
             "userName" to userName,
             "method" to method,
-            "coins" to coins,
+            "coins" to equivalentCoins,
             "inrAmount" to inrAmount,
             "upiId" to payoutMethods.upiId,
             "bankDetails" to mapOf(
