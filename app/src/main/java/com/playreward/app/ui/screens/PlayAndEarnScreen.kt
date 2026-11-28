@@ -2,6 +2,9 @@ package com.playreward.app.ui.screens
 
 import android.content.Intent
 import android.net.Uri
+import android.os.SystemClock
+import com.playreward.app.util.WebExploreHelper
+import kotlinx.coroutines.Job
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
@@ -213,34 +216,70 @@ fun QuizPlayScreen(
     var currentIndex by remember { mutableIntStateOf(0) }
     var showHint by remember { mutableStateOf(false) }
     var showClaimDialog by remember { mutableStateOf(false) }
-    var waitingWebReturn by remember { mutableStateOf(false) }
-    var webOpenedAtMs by remember { mutableLongStateOf(0L) }
+    var awaitingBrowser by remember { mutableStateOf(false) }
+    var leftToBrowser by remember { mutableStateOf(false) }
+    var browserStartElapsedMs by remember { mutableLongStateOf(0L) }
+    var countdownJob by remember { mutableStateOf<Job?>(null) }
     var earlyReturnWarning by remember { mutableStateOf<String?>(null) }
+    var gemEarnedMsg by remember { mutableStateOf<String?>(null) }
 
-    // Lifecycle observer to enforce required website explore time (e.g. 15 seconds)
-    DisposableEffect(lifecycleOwner, waitingWebReturn, webOpenedAtMs) {
+    fun launchQuizPartnerWebsite() {
+        val req = settings.requiredExploreSeconds.coerceAtLeast(1)
+        val opened = WebExploreHelper.openInBrowser(context, settings.websiteUrl)
+        if (!opened) {
+            viewModel.showToast("Could not open browser. Check Quiz Website URL in Admin Panel.", ToastType.ERROR)
+            return
+        }
+        awaitingBrowser = true
+        leftToBrowser = false
+        browserStartElapsedMs = SystemClock.elapsedRealtime()
+        countdownJob?.cancel()
+        countdownJob = WebExploreHelper.startLiveCountdownNotification(
+            context = context,
+            scope = scope,
+            requiredSeconds = req,
+            onTimeReached = { viewModel.soundFx.playSuccess() }
+        )
+    }
+
+    // Bulletproof ON_PAUSE -> ON_RESUME Chrome explore timer (never fires at 0s!)
+    DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME && waitingWebReturn) {
-                waitingWebReturn = false
-                val elapsedSec = ((System.currentTimeMillis() - webOpenedAtMs) / 1000L).toInt()
+            if (event == Lifecycle.Event.ON_PAUSE && awaitingBrowser) {
+                leftToBrowser = true
+                browserStartElapsedMs = SystemClock.elapsedRealtime()
+            } else if (event == Lifecycle.Event.ON_RESUME && awaitingBrowser && leftToBrowser) {
+                awaitingBrowser = false
+                leftToBrowser = false
+                countdownJob?.cancel()
+                countdownJob = null
+
+                val elapsedSec = ((SystemClock.elapsedRealtime() - browserStartElapsedMs) / 1000L).toInt().coerceAtLeast(0)
                 val reqSec = settings.requiredExploreSeconds.coerceAtLeast(1)
                 if (elapsedSec >= reqSec) {
                     val uid = profile?.uid
                     if (uid != null) {
                         scope.launch {
-                            viewModel.repo.addGems(uid, "quizGems", settings.gemsPerCorrect)
-                            viewModel.showToast("+${settings.gemsPerCorrect} Gem earned! Explore verified (${elapsedSec}s).", ToastType.SUCCESS)
-                            if (questions.isNotEmpty()) currentIndex = (currentIndex + 1) % questions.size
-                            showHint = false
+                            val res = viewModel.repo.addGems(uid, "quizGems", settings.gemsPerCorrect)
+                            if (res.isSuccess) {
+                                viewModel.soundFx.playCelebration()
+                                gemEarnedMsg = "Explored for ${WebExploreHelper.formatDuration(elapsedSec)} (Required: ${WebExploreHelper.formatDuration(reqSec)}). +${settings.gemsPerCorrect} Gem credited!"
+                                if (questions.isNotEmpty()) currentIndex = (currentIndex + 1) % questions.size
+                                showHint = false
+                            }
                         }
                     }
                 } else {
-                    earlyReturnWarning = "You returned after ${elapsedSec}s. Please explore the website for at least ${reqSec} seconds to earn your gem."
+                    viewModel.soundFx.playError()
+                    earlyReturnWarning = "You explored for ${WebExploreHelper.formatDuration(elapsedSec)} only. Please stay on the website for at least ${WebExploreHelper.formatDuration(reqSec)} to earn your gem."
                 }
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+        onDispose {
+            countdownJob?.cancel()
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
     }
 
     Column(modifier = Modifier.fillMaxSize().background(colors.canvas).statusBarsPadding().navigationBarsPadding()) {
@@ -357,15 +396,7 @@ fun QuizPlayScreen(
                     height = 44.dp,
                     onClick = {
                         showClaimDialog = false
-                        val url = settings.websiteUrl.ifBlank { "https://playreward.app" }
-                        webOpenedAtMs = System.currentTimeMillis()
-                        waitingWebReturn = true
-                        try {
-                            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
-                        } catch (_: Exception) {
-                            waitingWebReturn = false
-                            viewModel.showToast("Unable to open browser.", ToastType.ERROR)
-                        }
+                        launchQuizPartnerWebsite()
                     }
                 )
             },
@@ -383,7 +414,25 @@ fun QuizPlayScreen(
             title = { Text("Returned Too Early", color = colors.textPrimary) },
             text = { Text(msg, color = colors.textSecondary) },
             confirmButton = {
-                TextButton(onClick = { earlyReturnWarning = null }) { Text("Got It") }
+                PrimaryGradientButton(
+                    text = "Re-open Website",
+                    height = 42.dp,
+                    onClick = { earlyReturnWarning = null; launchQuizPartnerWebsite() }
+                )
+            },
+            dismissButton = { TextButton(onClick = { earlyReturnWarning = null }) { Text("Cancel") } }
+        )
+    }
+
+    gemEarnedMsg?.let { msg ->
+        AlertDialog(
+            onDismissRequest = { gemEarnedMsg = null },
+            containerColor = colors.card,
+            icon = { Image(painterResource(R.drawable.ic_gem), null, modifier = Modifier.size(44.dp)) },
+            title = { Text("Gem Claimed!", fontWeight = FontWeight.ExtraBold, color = colors.mintAccent) },
+            text = { Text(msg, color = colors.textPrimary) },
+            confirmButton = {
+                PrimaryGradientButton(text = "Awesome! OK", height = 42.dp, onClick = { gemEarnedMsg = null })
             }
         )
     }

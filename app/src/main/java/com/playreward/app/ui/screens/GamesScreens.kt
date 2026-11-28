@@ -2,6 +2,9 @@ package com.playreward.app.ui.screens
 
 import android.content.Intent
 import android.net.Uri
+import android.os.SystemClock
+import com.playreward.app.util.WebExploreHelper
+import kotlinx.coroutines.Job
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -84,35 +87,76 @@ fun MegaOfferScreen(
     var round by remember { mutableStateOf(generateRound()) }
     var streak by remember { mutableIntStateOf(0) }
     var showClaimPopup by remember { mutableStateOf(false) }
-    var waitingWebReturn by remember { mutableStateOf(false) }
-    var webOpenedAtMs by remember { mutableLongStateOf(0L) }
+
+    // Bulletproof Chrome explore state (never triggers prematurely on initial addObserver!)
+    var awaitingBrowser by remember { mutableStateOf(false) }
+    var leftToBrowser by remember { mutableStateOf(false) }
+    var browserStartElapsedMs by remember { mutableLongStateOf(0L) }
+    var countdownJob by remember { mutableStateOf<Job?>(null) }
+
     var earlyMsg by remember { mutableStateOf<String?>(null) }
+    var gemEarnedMsg by remember { mutableStateOf<String?>(null) }
     var claimingCoins by remember { mutableStateOf(false) }
     var celebrate by remember { mutableStateOf(false) }
 
-    DisposableEffect(lifecycleOwner, waitingWebReturn, webOpenedAtMs) {
+    fun launchPartnerWebsite() {
+        val req = config.requiredExploreSeconds.coerceAtLeast(1)
+        val opened = WebExploreHelper.openInBrowser(context, config.websiteUrl)
+        if (!opened) {
+            viewModel.showToast("Could not open browser. Check website URL in Admin Panel.", ToastType.ERROR)
+            return
+        }
+        awaitingBrowser = true
+        leftToBrowser = false
+        browserStartElapsedMs = SystemClock.elapsedRealtime()
+        countdownJob?.cancel()
+        countdownJob = WebExploreHelper.startLiveCountdownNotification(
+            context = context,
+            scope = scope,
+            requiredSeconds = req,
+            onTimeReached = { viewModel.soundFx.playSuccess() }
+        )
+    }
+
+    // Single stable observer — ONLY checks elapsed time AFTER ON_PAUSE confirms user actually left to Chrome!
+    DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME && waitingWebReturn) {
-                waitingWebReturn = false
-                val elapsed = ((System.currentTimeMillis() - webOpenedAtMs) / 1000L).toInt()
+            if (event == Lifecycle.Event.ON_PAUSE && awaitingBrowser) {
+                leftToBrowser = true
+                browserStartElapsedMs = SystemClock.elapsedRealtime()
+            } else if (event == Lifecycle.Event.ON_RESUME && awaitingBrowser && leftToBrowser) {
+                awaitingBrowser = false
+                leftToBrowser = false
+                countdownJob?.cancel()
+                countdownJob = null
+
+                val elapsed = ((SystemClock.elapsedRealtime() - browserStartElapsedMs) / 1000L).toInt().coerceAtLeast(0)
                 val req = config.requiredExploreSeconds.coerceAtLeast(1)
                 if (elapsed >= req) {
                     val uid = profile?.uid
                     if (uid != null) {
                         scope.launch {
-                            viewModel.repo.addGems(uid, "megaOfferGems", config.gemsPerWin)
-                            viewModel.showToast("+${config.gemsPerWin} Mega Offer Gem earned!", ToastType.SUCCESS)
-                            streak = 0
-                            round = generateRound()
+                            val res = viewModel.repo.addGems(uid, "megaOfferGems", config.gemsPerWin)
+                            if (res.isSuccess) {
+                                viewModel.soundFx.playCelebration()
+                                celebrate = true
+                                gemEarnedMsg = "You explored the website for ${WebExploreHelper.formatDuration(elapsed)} (Required: ${WebExploreHelper.formatDuration(req)}). +${config.gemsPerWin} Gem added!"
+                                streak = 0
+                                round = generateRound()
+                            }
                         }
                     }
                 } else {
-                    earlyMsg = "Explored for ${elapsed}s only. Please stay on the website for at least ${req} seconds to earn your gem."
+                    viewModel.soundFx.playError()
+                    earlyMsg = "You stayed on the website for ${WebExploreHelper.formatDuration(elapsed)} only. Please explore for at least ${WebExploreHelper.formatDuration(req)} to claim your gem."
                 }
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+        onDispose {
+            countdownJob?.cancel()
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
     }
 
     val currentGems = profile?.megaOfferGems ?: 0
@@ -149,17 +193,17 @@ fun MegaOfferScreen(
                 Text("$streak / ${config.correctAnswersNeeded}", color = colors.textSecondary, fontWeight = FontWeight.SemiBold)
             }
 
-            Spacer(Modifier.height(20.dp))
+            Spacer(Modifier.height(18.dp))
             Surface(
-                modifier = Modifier.size(190.dp),
-                shape = RoundedCornerShape(28.dp),
+                modifier = Modifier.size(180.dp),
+                shape = RoundedCornerShape(26.dp),
                 color = colors.lavenderSoft,
                 border = BorderStroke(1.5.dp, colors.primaryIndigo.copy(alpha = 0.25f))
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Text(
                         text = round.first.toString(),
-                        fontSize = 44.sp,
+                        fontSize = 42.sp,
                         fontWeight = FontWeight.ExtraBold,
                         color = colors.textPrimary,
                         letterSpacing = 2.sp
@@ -167,21 +211,22 @@ fun MegaOfferScreen(
                 }
             }
 
-            Spacer(Modifier.height(22.dp))
+            Spacer(Modifier.height(18.dp))
             Text("Select the matching number", style = MaterialTheme.typography.bodyLarge, color = colors.textSecondary)
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(14.dp))
 
             val choices = round.second
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 for (rowIdx in 0..1) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
                         for (colIdx in 0..1) {
                             val value = choices[rowIdx * 2 + colIdx]
                             PRCard(
                                 modifier = Modifier.weight(1f),
-                                cornerRadius = 24.dp,
-                                contentPadding = PaddingValues(vertical = 16.dp),
+                                cornerRadius = 20.dp,
+                                contentPadding = PaddingValues(vertical = 15.dp),
                                 onClick = {
+                                    viewModel.soundFx.playClick()
                                     if (value == round.first) {
                                         val next = streak + 1
                                         if (next >= config.correctAnswersNeeded) {
@@ -192,7 +237,7 @@ fun MegaOfferScreen(
                                             round = generateRound()
                                         }
                                     } else {
-                                        viewModel.showToast("Wrong number! Try matching ${round.first}.", ToastType.ERROR)
+                                        viewModel.showToast("Wrong number! Match ${round.first}.", ToastType.ERROR)
                                         round = generateRound()
                                     }
                                 }
@@ -210,20 +255,20 @@ fun MegaOfferScreen(
                 }
             }
 
-            Spacer(Modifier.height(28.dp))
-            PRCard(modifier = Modifier.fillMaxWidth(), cornerRadius = 20.dp) {
+            Spacer(Modifier.height(22.dp))
+            PRCard(modifier = Modifier.fillMaxWidth(), cornerRadius = 18.dp) {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Text("Mega Offer Goal", fontWeight = FontWeight.Bold, color = colors.textPrimary)
                     Text("$currentGems / $goal Gems", fontWeight = FontWeight.Bold, color = colors.primaryIndigo)
                 }
-                Spacer(Modifier.height(10.dp))
+                Spacer(Modifier.height(8.dp))
                 LinearProgressIndicator(
                     progress = { (currentGems.toFloat() / goal.toFloat()).coerceIn(0f, 1f) },
                     modifier = Modifier.fillMaxWidth().height(9.dp).clip(CircleShape),
                     color = colors.amberAccent,
                     trackColor = colors.amberSoft
                 )
-                Spacer(Modifier.height(14.dp))
+                Spacer(Modifier.height(12.dp))
                 PrimaryGradientButton(
                     text = if (currentGems >= goal) "Claim ${config.rewardCoins} Coins" else "Reach $goal Gems for ${config.rewardCoins} Coins",
                     enabled = currentGems >= goal,
@@ -243,6 +288,7 @@ fun MegaOfferScreen(
                             )
                             claimingCoins = false
                             if (res.isSuccess) {
+                                viewModel.soundFx.playCelebration()
                                 celebrate = true
                                 viewModel.showToast("+${config.rewardCoins} coins added to your wallet!", ToastType.SUCCESS)
                                 delay(2500)
@@ -265,7 +311,10 @@ fun MegaOfferScreen(
             containerColor = colors.card,
             title = { Text("Challenge Completed!", fontWeight = FontWeight.Bold, color = colors.textPrimary) },
             text = {
-                Text("Visit the partner website and explore for at least ${config.requiredExploreSeconds} seconds, then return to collect +${config.gemsPerWin} gem.", color = colors.textSecondary)
+                Text(
+                    "Tap Claim Gem to open the website in Chrome. Stay on it for at least ${WebExploreHelper.formatDuration(config.requiredExploreSeconds)} (live countdown shows in your notification bar), then return to collect +${config.gemsPerWin} Gem!",
+                    color = colors.textSecondary
+                )
             },
             confirmButton = {
                 PrimaryGradientButton(
@@ -273,10 +322,7 @@ fun MegaOfferScreen(
                     height = 44.dp,
                     onClick = {
                         showClaimPopup = false
-                        val url = config.websiteUrl.ifBlank { "https://playreward.app" }
-                        webOpenedAtMs = System.currentTimeMillis()
-                        waitingWebReturn = true
-                        try { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) } catch (_: Exception) { waitingWebReturn = false }
+                        launchPartnerWebsite()
                     }
                 )
             },
@@ -288,9 +334,37 @@ fun MegaOfferScreen(
         AlertDialog(
             onDismissRequest = { earlyMsg = null },
             containerColor = colors.card,
-            title = { Text("Explore Time Not Met", color = colors.textPrimary) },
+            icon = { Icon(Icons.Rounded.TimerOff, null, tint = colors.roseAccent) },
+            title = { Text("Explore Time Not Met", fontWeight = FontWeight.Bold, color = colors.textPrimary) },
             text = { Text(m, color = colors.textSecondary) },
-            confirmButton = { TextButton(onClick = { earlyMsg = null }) { Text("OK") } }
+            confirmButton = {
+                PrimaryGradientButton(
+                    text = "Re-open Website",
+                    height = 42.dp,
+                    onClick = {
+                        earlyMsg = null
+                        launchPartnerWebsite()
+                    }
+                )
+            },
+            dismissButton = { TextButton(onClick = { earlyMsg = null }) { Text("Cancel") } }
+        )
+    }
+
+    gemEarnedMsg?.let { m ->
+        AlertDialog(
+            onDismissRequest = { gemEarnedMsg = null; celebrate = false },
+            containerColor = colors.card,
+            icon = { Image(painterResource(R.drawable.ic_gem), null, modifier = Modifier.size(44.dp)) },
+            title = { Text("Gem Claimed!", fontWeight = FontWeight.ExtraBold, color = colors.mintAccent) },
+            text = { Text(m, color = colors.textPrimary, textAlign = TextAlign.Center) },
+            confirmButton = {
+                PrimaryGradientButton(
+                    text = "Awesome! OK",
+                    height = 42.dp,
+                    onClick = { gemEarnedMsg = null; celebrate = false }
+                )
+            }
         )
     }
 }
