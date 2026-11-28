@@ -262,3 +262,23 @@ data class GithubReleaseInfo(
     val apkDownloadUrl: String,
     val apkFileName: String
 )
+
+data class PvpRoom(
+    val roomId: String = "",
+    val tierId: String = "",
+    val tierLabel: String = "",
+    val difficulty: String = "",
+    val entryCoins: Long = 0L,
+    val winCoins: Long = 0L,
+    val playerXUid: String = "",
+    val playerXName: String = "",
+    val playerOUid: String = "",
+    val playerOName: String = "",
+    val board: List<String> = List(9) { "" },
+    val turn: String = "X",
+    val status: String = "PLAYING", // PLAYING, X_WIN, O_WIN, DRAW, FORFEIT_X, FORFEIT_O
+    val winningLine: List<Int> = emptyList(),
+    val lastMoveIndex: Int = -1,
+    val lastMoveAt: Long = 0L,
+    val createdAt: Long = 0L
+)

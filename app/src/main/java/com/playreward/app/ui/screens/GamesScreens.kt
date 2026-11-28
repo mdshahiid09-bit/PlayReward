@@ -325,7 +325,8 @@ private fun buildArenaTiers(adminTiers: List<TicTacToeTier>): List<TicTacToeTier
 fun SuperOfferTicTacToeScreen(
     viewModel: MainViewModel,
     onBack: () -> Unit,
-    onEnterMatch: (String) -> Unit
+    onEnterFreePractice: (String) -> Unit,
+    onEnterPvpMatchmaking: (String) -> Unit
 ) {
     val colors = PRTheme.colors
     val scope = rememberCoroutineScope()
@@ -383,7 +384,7 @@ fun SuperOfferTicTacToeScreen(
                             Row(modifier = Modifier.padding(horizontal = 9.dp, vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
                                 Icon(Icons.Rounded.SportsEsports, null, tint = Color.White, modifier = Modifier.size(13.dp))
                                 Spacer(Modifier.width(4.dp))
-                                Text("1v1 AI ARENA", color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 10.sp)
+                                Text("REAL 1v1 PVP ARENA", color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 10.sp)
                             }
                         }
                         Box(
@@ -404,7 +405,7 @@ fun SuperOfferTicTacToeScreen(
                     )
                     Spacer(Modifier.height(3.dp))
                     Text(
-                        text = "Practice free (+1 coin) or stake coins to multiply your rewards!",
+                        text = "Free Practice vs AI (+1 coin) • Paid Tables are 100% Real 1v1 Players (Zero Bots)!",
                         color = Color.White.copy(alpha = 0.9f),
                         fontSize = 12.sp,
                         lineHeight = 16.sp
@@ -493,7 +494,7 @@ fun SuperOfferTicTacToeScreen(
                             )
                             Surface(shape = CircleShape, color = diffBg) {
                                 Text(
-                                    text = tier.difficulty,
+                                    text = if (isFree) "AI PRACTICE" else "1v1 REAL • ${tier.difficulty}",
                                     color = diffTint,
                                     fontSize = 9.5.sp,
                                     fontWeight = FontWeight.ExtraBold,
@@ -588,11 +589,10 @@ fun SuperOfferTicTacToeScreen(
                     isLoading = starting,
                     height = 42.dp,
                     onClick = {
-                        val uid = profile?.uid ?: return@PrimaryGradientButton
                         if (isFree) {
                             val id = tier.id
                             pendingTier = null
-                            onEnterMatch(id)
+                            onEnterFreePractice(id)
                             return@PrimaryGradientButton
                         }
                         if ((profile?.coins ?: 0L) < tier.entryCoins) {
@@ -600,24 +600,9 @@ fun SuperOfferTicTacToeScreen(
                             viewModel.showToast("Not enough coins! Play Free Practice or earn ${tier.entryCoins} coins.", ToastType.ERROR)
                             return@PrimaryGradientButton
                         }
-                        scope.launch {
-                            starting = true
-                            val res = viewModel.repo.adjustCoins(
-                                uid = uid,
-                                deltaCoins = -tier.entryCoins,
-                                countAsEarned = false,
-                                txType = "TIC_TAC_TOE_ENTRY",
-                                txTitle = "Tic-Tac-Toe Entry (${tier.label})"
-                            )
-                            starting = false
-                            if (res.isSuccess) {
-                                val id = tier.id
-                                pendingTier = null
-                                onEnterMatch(id)
-                            } else {
-                                viewModel.showToast(res.exceptionOrNull()?.message ?: "Could not start match.", ToastType.ERROR)
-                            }
-                        }
+                        val id = tier.id
+                        pendingTier = null
+                        onEnterPvpMatchmaking(id)
                     }
                 )
             },

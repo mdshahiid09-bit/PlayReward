@@ -829,6 +829,199 @@ class FirebaseRepository {
         ).await()
     }
 
+
+    // --- Real-Time 1v1 PvP Tic-Tac-Toe Matchmaking (Zero Bots, 100% Spark Plan RTDB) ---
+
+    suspend fun findOrJoinPvpQueue(
+        uid: String,
+        fullName: String,
+        tier: TicTacToeTier
+    ): Result<String?> = runCatching {
+        // Clear any stale previous match notification for this user
+        db.getReference("tttQueueResult/$uid").removeValue().await()
+
+        val now = System.currentTimeMillis()
+        val queueRef = db.getReference("tttQueue/${tier.id}")
+        var matchedRoomId: String? = null
+        var matchedOpponentUid: String? = null
+        var matchedOpponentName: String? = null
+
+        val txResult = suspendCancellableCoroutine<Boolean> { cont ->
+            queueRef.runTransaction(object : Transaction.Handler {
+                override fun doTransaction(currentData: MutableData): Transaction.Result {
+                    val waitingUid = currentData.child("uid").getValue(String::class.java)
+                    val waitingName = currentData.child("name").getValue(String::class.java) ?: "Player"
+                    val waitingAt = currentData.child("joinedAt").getValue(Long::class.java) ?: 0L
+                    val isFresh = waitingUid != null && waitingUid != uid && (now - waitingAt) < 90_000L
+
+                    if (isFresh && waitingUid != null) {
+                        val roomId = "room_" + UUID.randomUUID().toString().replace("-", "").take(12)
+                        matchedRoomId = roomId
+                        matchedOpponentUid = waitingUid
+                        matchedOpponentName = waitingName
+                        currentData.value = null // Atomically claim opponent from queue
+                    } else {
+                        matchedRoomId = null
+                        currentData.value = mapOf(
+                            "uid" to uid,
+                            "name" to fullName.ifBlank { "Player" },
+                            "joinedAt" to now
+                        )
+                    }
+                    return Transaction.success(currentData)
+                }
+
+                override fun onComplete(error: DatabaseError?, committed: Boolean, snapshot: DataSnapshot?) {
+                    cont.resume(error == null && committed)
+                }
+            })
+        }
+
+        if (!txResult) error("Matchmaking busy. Please retry.")
+
+        val roomId = matchedRoomId
+        val oppUid = matchedOpponentUid
+        if (roomId != null && oppUid != null) {
+            val roomPayload = mapOf(
+                "roomId" to roomId,
+                "tierId" to tier.id,
+                "tierLabel" to tier.label,
+                "difficulty" to tier.difficulty,
+                "entryCoins" to tier.entryCoins,
+                "winCoins" to tier.winCoins,
+                "playerXUid" to oppUid,
+                "playerXName" to (matchedOpponentName ?: "Player"),
+                "playerOUid" to uid,
+                "playerOName" to fullName.ifBlank { "Player" },
+                "board" to List(9) { "" },
+                "turn" to "X",
+                "status" to "PLAYING",
+                "winningLine" to emptyList<Int>(),
+                "lastMoveIndex" to -1,
+                "lastMoveAt" to now,
+                "createdAt" to now
+            )
+            db.getReference("tttRooms/$roomId").setValue(roomPayload).await()
+            db.getReference("tttQueueResult/$oppUid").setValue(roomId).await()
+            roomId
+        } else {
+            null // Waiting in queue for a real player to join
+        }
+    }
+
+    suspend fun leavePvpQueue(uid: String, tierId: String) {
+        try {
+            val ref = db.getReference("tttQueue/$tierId")
+            val snap = ref.get().await()
+            if (snap.child("uid").getValue(String::class.java) == uid) {
+                ref.removeValue().await()
+            }
+            db.getReference("tttQueueResult/$uid").removeValue().await()
+        } catch (_: Exception) {
+        }
+    }
+
+    fun observeQueueMatchRoom(uid: String): Flow<String?> = observeNode("tttQueueResult/$uid") { snap ->
+        snap.getValue(String::class.java)?.takeIf { it.isNotBlank() }
+    }
+
+    fun observePvpRoom(roomId: String): Flow<PvpRoom?> = observeNode("tttRooms/$roomId") { snap ->
+        if (!snap.exists()) return@observeNode null
+        val boardList = (0..8).map { i -> snap.child("board").child(i.toString()).getValue(String::class.java) ?: "" }
+        val lineList = snap.child("winningLine").children.mapNotNull { it.getValue(Long::class.java)?.toInt() }
+        PvpRoom(
+            roomId = roomId,
+            tierId = snap.child("tierId").getValue(String::class.java) ?: "",
+            tierLabel = snap.child("tierLabel").getValue(String::class.java) ?: "Arena",
+            difficulty = snap.child("difficulty").getValue(String::class.java) ?: "",
+            entryCoins = snap.child("entryCoins").getValue(Long::class.java) ?: 0L,
+            winCoins = snap.child("winCoins").getValue(Long::class.java) ?: 0L,
+            playerXUid = snap.child("playerXUid").getValue(String::class.java) ?: "",
+            playerXName = snap.child("playerXName").getValue(String::class.java) ?: "Player X",
+            playerOUid = snap.child("playerOUid").getValue(String::class.java) ?: "",
+            playerOName = snap.child("playerOName").getValue(String::class.java) ?: "Player O",
+            board = boardList,
+            turn = snap.child("turn").getValue(String::class.java) ?: "X",
+            status = snap.child("status").getValue(String::class.java) ?: "PLAYING",
+            winningLine = lineList,
+            lastMoveIndex = (snap.child("lastMoveIndex").getValue(Long::class.java) ?: -1L).toInt(),
+            lastMoveAt = snap.child("lastMoveAt").getValue(Long::class.java) ?: 0L,
+            createdAt = snap.child("createdAt").getValue(Long::class.java) ?: 0L
+        )
+    }
+
+    suspend fun makePvpMove(roomId: String, cellIndex: Int, mySymbol: String): Result<Unit> = runCatching {
+        val winLines = listOf(
+            listOf(0, 1, 2), listOf(3, 4, 5), listOf(6, 7, 8),
+            listOf(0, 3, 6), listOf(1, 4, 7), listOf(2, 5, 8),
+            listOf(0, 4, 8), listOf(2, 4, 6)
+        )
+        val ok = suspendCancellableCoroutine<Boolean> { cont ->
+            db.getReference("tttRooms/$roomId").runTransaction(object : Transaction.Handler {
+                override fun doTransaction(currentData: MutableData): Transaction.Result {
+                    val status = currentData.child("status").getValue(String::class.java) ?: "PLAYING"
+                    val turn = currentData.child("turn").getValue(String::class.java) ?: "X"
+                    if (status != "PLAYING" || turn != mySymbol) return Transaction.abort()
+
+                    val board = (0..8).map { i -> currentData.child("board").child(i.toString()).getValue(String::class.java) ?: "" }.toMutableList()
+                    if (cellIndex !in 0..8 || board[cellIndex].isNotEmpty()) return Transaction.abort()
+
+                    board[cellIndex] = mySymbol
+                    currentData.child("board").value = board
+                    currentData.child("lastMoveIndex").value = cellIndex
+                    currentData.child("lastMoveAt").value = System.currentTimeMillis()
+
+                    var winLine: List<Int>? = null
+                    for (line in winLines) {
+                        if (board[line[0]] == mySymbol && board[line[1]] == mySymbol && board[line[2]] == mySymbol) {
+                            winLine = line
+                            break
+                        }
+                    }
+                    when {
+                        winLine != null -> {
+                            currentData.child("status").value = if (mySymbol == "X") "X_WIN" else "O_WIN"
+                            currentData.child("winningLine").value = winLine
+                        }
+                        board.none { it.isEmpty() } -> {
+                            currentData.child("status").value = "DRAW"
+                        }
+                        else -> {
+                            currentData.child("turn").value = if (mySymbol == "X") "O" else "X"
+                        }
+                    }
+                    return Transaction.success(currentData)
+                }
+                override fun onComplete(error: DatabaseError?, committed: Boolean, snapshot: DataSnapshot?) {
+                    cont.resume(error == null && committed)
+                }
+            })
+        }
+        if (!ok) error("Move not allowed.")
+    }
+
+    suspend fun forfeitPvpRoom(roomId: String, mySymbol: String) {
+        try {
+            val statusRef = db.getReference("tttRooms/$roomId/status")
+            val cur = statusRef.get().await().getValue(String::class.java)
+            if (cur == "PLAYING") {
+                statusRef.setValue(if (mySymbol == "X") "FORFEIT_X" else "FORFEIT_O").await()
+            }
+        } catch (_: Exception) {
+        }
+    }
+
+    suspend fun claimPvpTimeoutWin(roomId: String, opponentSymbol: String) {
+        try {
+            val statusRef = db.getReference("tttRooms/$roomId/status")
+            val cur = statusRef.get().await().getValue(String::class.java)
+            if (cur == "PLAYING") {
+                statusRef.setValue(if (opponentSymbol == "X") "FORFEIT_X" else "FORFEIT_O").await()
+            }
+        } catch (_: Exception) {
+        }
+    }
+
     fun signOut() {
         auth.signOut()
     }

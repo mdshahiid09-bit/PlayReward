@@ -71,6 +71,18 @@
         ".read": "auth != null && auth.uid == $uid",
         ".write": "auth != null && auth.uid == $uid"
       }
+    },
+    "tttQueue": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "tttQueueResult": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "tttRooms": {
+      ".read": "auth != null",
+      ".write": "auth != null"
     }
   }
 }

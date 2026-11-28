@@ -387,7 +387,33 @@ private fun PlayRewardRoot(vm: MainViewModel, onExitApp: () -> Unit) {
                                 SuperOfferTicTacToeScreen(
                                     viewModel = vm,
                                     onBack = { navController.popBackStack() },
-                                    onEnterMatch = { tierId -> navController.navigate("tictactoe_match/${Uri.encode(tierId)}") }
+                                    onEnterFreePractice = { tierId -> navController.navigate("tictactoe_match/${Uri.encode(tierId)}") },
+                                    onEnterPvpMatchmaking = { tierId -> navController.navigate("tictactoe_matchmaking/${Uri.encode(tierId)}") }
+                                )
+                            }
+                            composable(
+                                "tictactoe_matchmaking/{tierId}",
+                                arguments = listOf(navArgument("tierId") { type = NavType.StringType })
+                            ) {
+                                PvpMatchmakingScreen(
+                                    tierId = Uri.decode(it.arguments?.getString("tierId").orEmpty()),
+                                    viewModel = vm,
+                                    onCancel = { navController.popBackStack() },
+                                    onMatchFound = { roomId ->
+                                        navController.navigate("tictactoe_pvp/${Uri.encode(roomId)}") {
+                                            popUpTo("tictactoe_matchmaking/{tierId}") { inclusive = true }
+                                        }
+                                    }
+                                )
+                            }
+                            composable(
+                                "tictactoe_pvp/{roomId}",
+                                arguments = listOf(navArgument("roomId") { type = NavType.StringType })
+                            ) {
+                                PvpMatchScreen(
+                                    roomId = Uri.decode(it.arguments?.getString("roomId").orEmpty()),
+                                    viewModel = vm,
+                                    onExitToLobby = { navController.popBackStack("super_offer", inclusive = false) }
                                 )
                             }
                             composable(
